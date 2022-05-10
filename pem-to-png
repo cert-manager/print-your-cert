@@ -1,0 +1,32 @@
+#! /usr/bin/env bash
+
+# entr bash -c "./pem-to-png <foo.crt" <<<$'pem-to-png\n'
+
+set -euo pipefail
+
+echo "Reading PEM from stdin..." >&2
+cat >/tmp/crt
+
+cat <<EOF >/tmp/pem-to-png.txt
+
+Thank you for visiting the cert-manager
+booth! We hope you are enjoying
+your time in Valencia.
+
+This card is a proof that you
+were there! on the back of
+the card, the QR code
+contains your certificate.
+EOF
+
+# brother_ql must be used with "--rotate 90".
+convert -size 984x696 canvas:white \
+    \( -gravity NorthEast kubecon-eu-2022-logo.svg -resize 400x400 -background white -alpha remove -alpha off -monochrome \) -geometry +0+0 -composite \
+    \( -gravity NorthEast logo.svg -resize 370x370 -background white -alpha remove -alpha off -monochrome \) -geometry +20+190 -composite \
+    \( -gravity NorthWest -font Open-Sans -pointsize 30 -fill black -annotate +0-40 "@/tmp/pem-to-png.txt" \) -geometry +0+0 \
+    \( -gravity SouthWest -font DejaVu-Sans-Mono -pointsize 26 -fill black -annotate +0+0 "$(step certificate inspect --short /tmp/crt | sed -e 's/\[\(.*\)\]/\n\1/' -e 's/Certificate (\(.*\))/Certificate\nAlgorithm: \1/' | sed 's/^  //')" \) -geometry +0+0 \
+    -background None -layers Flatten front.png
+
+qrencode --type PNG --margin 0 -o - </tmp/crt | convert - -monochrome -filter point -interpolate nearest -resize 696x696 back.png
+
+echo "PNG front.png and back.png were saved" >&2

@@ -1,0 +1,18 @@
+FROM alpine:edge
+
+WORKDIR /root
+
+RUN echo "@testing http://dl-cdn.alpinelinux.org/alpine/edge/testing" | tee -a /etc/apk/repositories \
+    && apk add --update --no-cache python3 py3-pillow py3-future py3-jinja2 py3-bottle py3-pip py3-usb imagemagick ttf-opensans libqrencode step-cli openssl bash curl libusb fontconfig ttf-dejavu \
+    && pip3 install --no-cache-dir --upgrade brother_ql \
+    && apk add timg@testing \
+    && curl -sSL https://github.com/pklaus/brother_ql_web/archive/refs/heads/master.tar.gz | tar xz -C /root \
+    && cd /root/brother_ql_web-master \
+    && pip3 --no-cache-dir install -r requirements.txt \
+    && printf '#!/bin/sh\ncd /root/brother_ql_web-master && exec python3 ./brother_ql_web.py "$@"\n' >/usr/local/bin/brother_ql_web \
+    && chmod +x /usr/local/bin/brother_ql_web
+
+COPY config.json /root
+COPY pem-to-png /usr/local/bin
+
+EXPOSE 8013
