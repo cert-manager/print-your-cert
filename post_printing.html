@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style></style>
+  </head>
+  <body>
+    <h1>Printing your certificate</h1>
+    <div>
+      {{if .Error}}
+      <p style="color: #800000">{{.Error}}</p>
+      {{else}}
+      <p style="color: seagreen">Your certificate should now get printed!</p>
+      <form method="GET" action="/">
+        <input name="name" type="text" value="{{.Name}}" hidden required />
+        <input name="email" type="text" value="{{.Email}}" hidden required />
+        <input type="submit" value="Back to your certificate" />
+      </form>
+      {{end}}
+    </div>
+  </body>
+</html>

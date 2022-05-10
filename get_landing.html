@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style></style>
+  </head>
+  <body>
+    <h1>Create your certificate</h1>
+    <div>
+      <form method="GET" action="/">
+        <label>Name</label>
+        <input name="name" type="text" value="{{.Name}}" required />
+        <label>Email</label>
+        <input name="email" type="text" value="{{.Email}}" required />
+        <input type="submit" value="Get your certificate" />
+      </form>
+    </div>
+    <div>
+      {{if .Error}}
+      <p style="color: #800000">{{.Error}}</p>
+      {{end}} {{if .Message}}
+      <p style="color: seagreen">{{.Message}}</p>
+      {{end}} {{if .Certificate}}
+      <div>{{template "certificate" .Certificate}}</div>
+      <div>
+        <form method="POST" action="/">
+          <input name="name" type="text" value="{{.Name}}" hidden />
+          <input name="email" type="text" value="{{.Email}}" hidden />
+          <input type="submit" value="Print your certificate" />
+        </form>
+      </div>
+      {{end}}
+    </div>
+  </body>
+</html>

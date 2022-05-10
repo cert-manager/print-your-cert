@@ -1,0 +1,13 @@
+{{define "certificate"}}
+
+<h1>Here is your certificate, {{.Subject}}</h1>
+<pre>
+X.509v3 TLS Certificate ({{.PublicKeyAlgorithm}})
+Serial: {{.Serial}}
+Subject: {{.Subject}}
+Issuer: {{.Issuer}}
+Valid from: {{.NotBefore}}
+        to: {{.NotAfter}}
+</pre>
+
+{{end}}
