@@ -1,3 +1,6 @@
 *.crt
 *.key
 *.png
+print-your-cert
+print-your-cert-front.tar
+*.tar
