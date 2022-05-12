@@ -203,3 +203,110 @@ timg pem-to-png.png
 read
 brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 pem-to-png.png
 ```
+
+# Public IP on my machine with f1.micro + WireGuard
+
+Based on https://blog.kmassada.com/quickstart-wireguard-beryl-gcp/ (2020).
+
+```shell=sh
+gcloud iam service-accounts create secret-accessor \
+  --description "SA for accessing Secret Manager secrets" \
+  --display-name "secret accessor" \
+  --project jetstack-mael-valais
+gcloud projects add-iam-policy-binding jetstack-mael-valais \
+  --member serviceAccount:secret-accessor@jetstack-mael-valais.iam.gserviceaccount.com \
+  --role roles/secretmanager.secretAccessor \
+  --project jetstack-mael-valais
+```
+
+```shell=sh
+gcloud compute firewall-rules create allow-wireguard \
+    --project jetstack-mael-valais \
+    --network default \
+    --action allow \
+    --direction ingress \
+    --rules udp:51820 \
+    --source-ranges 0.0.0.0/0
+gcloud compute instances create wireguard \
+    --project jetstack-mael-valais \
+    --network default \
+    --machine-type=e2-micro \
+    --image-family=debian-11 \
+    --image-project=debian-cloud \
+    --can-ip-forward \
+    --boot-disk-size=10GB \
+    --zone=europe-southwest1-c
+```
+
+Then, I went to <https://google.domains> and added the record:
+
+```dns
+print-your-cert.mael.pw.  300  IN   A   34.175.254.25
+```
+
+To get the IP, I ran:
+
+```sh
+gcloud compute instances describe wireguard \
+    --project jetstack-mael-valais \
+    --zone=europe-southwest1-c --format json \
+      | jq -r '.networkInterfaces[].accessConfigs[] | select(.type=="ONE_TO_ONE_NAT") | .natIP'
+```
+
+Now, let us configure stuff on the VM:
+
+```shell=sh
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- 'sudo apt install wireguard -y'
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- \
+    "sudo perl -ni -e 'print if \!/^net.ipv4.ip_forward=1/d' /etc/sysctl.conf; \
+     sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1"
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- sudo reboot
+```
+
+```sh
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- bash <<EOF
+(umask 077 && wg genkey > wg-private.key)
+wg pubkey < wg-private.key > wg-public.key
+EOF
+```
+
+```sh
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- bash <<'EOF'
+sudo tee /etc/wireguard/wg0.conf <<WG0
+[Interface]
+PrivateKey = $(cat wg-private.key)
+MTU = 1380
+Address = 10.0.2.1/24
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o $(ip -o -4 route show to default | awk '{print $5}') -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o $(ip -o -4 route show to default | awk '{print $5}') -j MASQUERADE
+ListenPort = 51820
+SaveConfig = True
+AllowedIPs = ::/0, 0.0.0.0/0
+WG0
+EOF
+sudo wg-quick up wg0
+```
+
+## Another way: Tailscale + Caddy
+
+```sh
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- bash <<'EOF'
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo tee /etc/apt/trusted.gpg.d/caddy-stable.asc
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update
+sudo apt install caddy
+EOF
+```
+
+```sh
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- bash <<'EOF'
+sudo tee /etc/caddy/Caddyfile <<CADDY
+print-your-cert.mael.pw:443 {
+        reverse_proxy $(tailscale ip -4 pi):8080
+}
+CADDY
+sudo systemctl restart caddy.service
+EOF
+```
+
