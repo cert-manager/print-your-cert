@@ -99,21 +99,38 @@ func hello() func(http.ResponseWriter, *http.Request) {
 
 		switch r.Method {
 		case "GET":
-
 			personName := r.URL.Query().Get("name")
 			email := r.URL.Query().Get("email")
 
 			// Happily return early if the name or email haven't been
 			// provided yet.
-			if personName == "" || email == "" {
-				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Error: "To get your certificate, fill in your name and email."})
-				log.Printf("GET: the user has given an empty name %q or an empty email %q", personName, email)
+			if personName == "" && email == "" {
+				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Message: "Welcome! To get your certificate, fill in your name and email."})
+				return
+			}
+
+			// Let's check that both the email and name have been entered.
+			if personName == "" && email != "" || personName != "" && email == "" {
+				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Message: "Please fill in both the email and name."})
+				log.Printf("GET /: the user has given an empty name %q or an empty email %q", personName, email)
 				return
 			}
 
 			if !valid(email) {
 				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Error: "The email is invalid."})
-				log.Printf("GET: the user %q has given an invalid email %q", personName, email)
+				log.Printf("GET /: the user %q has given an invalid email %q", personName, email)
+				return
+			}
+
+			// Check that the "Name <email@foo.bar>" is under the common
+			// name limit of 64 bytes. Hopefully, that should be enough for
+			// most people, but let's help them out in case their name and
+			// email go above the limit.
+			commonName := fmt.Sprintf("%s <%s>", personName, email)
+			if len(commonName) > 64 {
+				msg := fmt.Sprintf("Oops, the common name formed using your name and email (%s) counts as %d bytes which goes beyond the common name limit of 64 bytes. Could you try abbreviating some part of your name and try again?", commonName, len(commonName))
+				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Error: msg})
+				log.Printf("GET /: the user %q has given a common name %q that is above the 64 bytes limit", personName, commonName)
 				return
 			}
 
@@ -131,7 +148,7 @@ func hello() func(http.ResponseWriter, *http.Request) {
 						Name: certName,
 					},
 					Spec: certmanagerv1.CertificateSpec{
-						CommonName: personName + " <" + email + ">",
+						CommonName: commonName,
 						SecretName: certName,
 						IssuerRef: cmmetav1.ObjectReference{
 							Name: *issuer,
@@ -141,26 +158,25 @@ func hello() func(http.ResponseWriter, *http.Request) {
 				}, metav1.CreateOptions{})
 				if err != nil {
 					tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Error: "There was an error creating your certificate."})
-					log.Printf("GET: issue while creating the Certificate named %s in namespace %s for '%s <%s>' in Kubernetes: %v", certName, *namespace, personName, email, err)
+					log.Printf("GET /: issue while creating the Certificate named %s in namespace %s for '%s <%s>' in Kubernetes: %v", certName, *namespace, personName, email, err)
 					return
 				}
 
 				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Message: "A certificate was successfully requested. Reload to see the progress."})
-				log.Printf("GET: successfully created a certificate named %s in namespace %s for '%s <%s>' in Kubernetes", certName, *namespace, personName, email)
+				log.Printf("GET /: successfully created a certificate named %s in namespace %s for '%s <%s>' in Kubernetes", certName, *namespace, personName, email)
 				return
 			case err != nil:
 				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Error: "Failed getting the Certificate in Kubernetes."})
-				log.Printf("GET: while getting the Certificate %s in namespace %s in Kubernetes: %v", certName, *namespace, err)
+				log.Printf("GET /: while getting the Certificate %s in namespace %s in Kubernetes: %v", certName, *namespace, err)
 				return
 			}
 
 			// Success: we found the Certificate in Kubernetes. Let us see
 			// if it is ready.
-
 			cond := apiutil.GetCertificateCondition(cert, "Ready")
 			if cond == nil || cond.Status != "True" {
 				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Message: "Your certificate is not ready yet. Reload to see the progress."})
-				log.Printf("GET: the requested certificate %s in namespace %s is not ready yet", certName, *namespace)
+				log.Printf("GET /: the requested certificate %s in namespace %s is not ready yet", certName, *namespace)
 				return
 			}
 
@@ -168,7 +184,7 @@ func hello() func(http.ResponseWriter, *http.Request) {
 			secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
 			if err != nil {
 				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Error: "A certificate already exists, but the Secret does not exist."})
-				log.Printf("GET: the requested certificate %s in namespace %s exists, but the Secret %s does not", certName, *namespace, cert.Spec.SecretName)
+				log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s does not", certName, *namespace, cert.Spec.SecretName)
 				return
 			}
 
@@ -177,7 +193,7 @@ func hello() func(http.ResponseWriter, *http.Request) {
 			certPem, ok := secret.Data["tls.crt"]
 			if !ok {
 				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Error: "Internal issue with the stored certificate in Kubernetes."})
-				log.Printf("GET: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'", certName, *namespace, cert.Spec.SecretName)
+				log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'", certName, *namespace, cert.Spec.SecretName)
 				return
 			}
 
@@ -186,16 +202,24 @@ func hello() func(http.ResponseWriter, *http.Request) {
 			x509Cert, err := x509.ParseCertificate(certBlock.Bytes)
 			if err != nil {
 				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Error: "Internal issue with parsing the issued certificate when parsing it."})
-				log.Printf("GET: the requested certificate %s in namespace %s exists, but the Secret %s contains in its tls.crt field an invalid PEM certificate", certName, *namespace, cert.Spec.SecretName)
+				log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s contains in its tls.crt field an invalid PEM certificate", certName, *namespace, cert.Spec.SecretName)
 				return
 			}
 
-			// Let's show the user the Certificate.
+			// Let's show the user the Certificate. Since we can't change
+			// the name of a given certificate, and the UI doesn't make it
+			// clear, let us also warn the user that each certificate is
+			// associated with a specific email, and that when the
+			// certificate is already issued, the name cannot be changed.
+			errMsg := ""
+			if cert.Spec.CommonName != commonName {
+				errMsg = "Warning: the name is different from the name in the certificate we already have for this email. Each certificate is associate to an email, and although you cannot change the name of a certificate once it is issued, but you can use another email to create a new certificate."
+			}
 			certificateHTMLData := certificateToHTML(x509Cert)
-			err = tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Certificate: certificateHTMLData})
+			err = tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Certificate: &certificateHTMLData, Error: errMsg})
 			if err != nil {
 				tmpl.ExecuteTemplate(w, "get_landing.html", getLandingHTMLData{Name: personName, Email: email, Error: "An unexpected error happened."})
-				log.Printf("GET: failure while executing the template for get_landing.html: %v", err)
+				log.Printf("GET /: failure while executing the template for get_landing.html: %v", err)
 				return
 			}
 		case "POST":
@@ -203,7 +227,7 @@ func hello() func(http.ResponseWriter, *http.Request) {
 			err := r.ParseForm()
 			if err != nil {
 				tmpl.ExecuteTemplate(w, "post_printing.html", postPrintingHTMLData{Error: "Failed parsing the POST form."})
-				log.Printf("POST: while parsing the form: %v", err)
+				log.Printf("POST /: while parsing the form: %v", err)
 				return
 			}
 
@@ -212,13 +236,13 @@ func hello() func(http.ResponseWriter, *http.Request) {
 
 			if email == "" || personName == "" {
 				tmpl.ExecuteTemplate(w, "post_printing.html", postPrintingHTMLData{Name: personName, Email: email, Error: "No email address provided."})
-				log.Printf("POST: no email address provided")
+				log.Printf("POST /: no email address provided")
 				return
 			}
 
 			if !valid(email) {
 				tmpl.ExecuteTemplate(w, "post_printing.html", postPrintingHTMLData{Name: personName, Email: email, Error: "The email is invalid."})
-				log.Printf("GET: the user %q has given an invalid email %q", personName, email)
+				log.Printf("GET /: the user %q has given an invalid email %q", personName, email)
 				return
 			}
 
@@ -228,7 +252,7 @@ func hello() func(http.ResponseWriter, *http.Request) {
 			cert, err := cmclient.CertmanagerV1().Certificates(*namespace).Get(r.Context(), certName, metav1.GetOptions{})
 			if err != nil {
 				tmpl.ExecuteTemplate(w, "post_printing.html", postPrintingHTMLData{Name: personName, Email: email, Error: "This email has not been used to create a certificate previously."})
-				log.Printf("POST: the email %q has not been used to create a certificate previously", email)
+				log.Printf("POST /: the email %q has not been used to create a certificate previously", email)
 				return
 			}
 
@@ -239,13 +263,13 @@ func hello() func(http.ResponseWriter, *http.Request) {
 			_, err = cmclient.CertmanagerV1().Certificates(*namespace).Update(r.Context(), cert, metav1.UpdateOptions{})
 			if err != nil {
 				tmpl.ExecuteTemplate(w, "post_printing.html", postPrintingHTMLData{Name: personName, Email: email, Error: "Could not trigger the print of the certificate."})
-				log.Printf("POST: could not trigger the print of the certificate %s in namespace %s: %v", certName, *namespace, err)
+				log.Printf("POST /: could not trigger the print of the certificate %s in namespace %s: %v", certName, *namespace, err)
 				return
 			}
 
 			// Done!
 			tmpl.ExecuteTemplate(w, "post_printing.html", postPrintingHTMLData{Name: personName, Email: email})
-			log.Printf("POST: the certificate %s in namespace %s was added the annotation print:true", certName, *namespace)
+			log.Printf("POST /: the certificate %s in namespace %s was added the annotation print:true", certName, *namespace)
 
 		default:
 			fmt.Fprintf(w, "Sorry, only GET and POST methods are supported.")
@@ -254,17 +278,17 @@ func hello() func(http.ResponseWriter, *http.Request) {
 }
 
 type getLandingHTMLData struct {
-	Name        string
-	Email       string
-	Certificate certificateHTMLData
-	Error       string
-	Message     string
+	Name        string               // Optional.
+	Email       string               // Optional.
+	Certificate *certificateHTMLData // Optional.
+	Error       string               // Optional.
+	Message     string               // Optional.
 }
 
 type postPrintingHTMLData struct {
-	Name  string
-	Email string
-	Error string
+	Name  string // Mandatory.
+	Email string // Mandatory.
+	Error string // Optional.
 }
 
 type certificateHTMLData struct {

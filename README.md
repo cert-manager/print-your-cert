@@ -7,7 +7,8 @@ things:
 
 - [Install tailscale](https://tailscale.com/download/).
 - Run `tailscale up`, it should open something in your browser → "Sign in with GitHub" → Authorize Tailscale → Multi-user Tailnet cert-manager.
-- You can test the "front end" UI at <http://100.100.85.57:8080/>.
+- You can test the "front end" UI at <http://100.100.85.57/>.
+- You can test that the printer works at <http://100.100.85.57:8013/>.
 - You can SSH into the Pi (which runs a Kubernetes cluster) as long as
   you are a member of the cert-manager org:
 
@@ -16,6 +17,67 @@ things:
   ```
 
   > The public keys have been added to the `authorized_keys` of the Pi.
+
+## Running
+
+Make sure that a k3s cluster is running on the Pi:
+
+```sh
+$ kubectl get nodes
+NAME                       STATUS   ROLES                  AGE   VERSION
+k3d-k3s-default-server-0   Ready    control-plane,master   11m   v1.22.7+k3s1
+```
+
+Make sure cert-manager is running:
+
+```sh
+kubectl apply -f- <<EOF
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: self-signed
+  namespace: default
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ca
+  namespace: default
+spec:
+  isCA: true
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  secretName: ca
+  commonName: The maintainers <cert-manager-maintainers@googlegroups.com>
+  issuerRef:
+    name: self-signed
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ca-issuer
+  namespace: default
+spec:
+  ca:
+    secretName: ca
+EOF
+```
+
+### print-your-cert-back
+
+```sh
+docker run -d --name print-your-cert-back --privileged -v /dev/bus/usb:/dev/bus/usb -it --rm -p 0.0.0.0:8013:8013 github.com/maelvls/print-your-cert:latest brother_ql_web
+```
+
+### print-your-cert-front
+
+```sh
+docker run -d --name print-your-cert-front --net=host -v $HOME/.kube/config:/root/.kube/config github.com/maelvls/print-your-cert-front:latest print-your-cert --issuer ca-issuer --listen 0.0.0.0:80
+```
 
 ## Troubleshooting
 
@@ -40,7 +102,7 @@ I found that two reasons lead to this message:
 2. A second reason is that the label settings aren't correct (e.g., you have select
    the black/red tape but the black-only tape is installed in the printer).
 
-### From the web UI: `No such file or directory: '/dev/usb/lp1'``
+### From the web UI: `No such file or directory: '/dev/usb/lp1'`
 
 This happened when the printer was disconnected.
 
