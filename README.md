@@ -87,7 +87,7 @@ docker buildx build -f Dockerfile.ui --platform linux/arm64/v8 -t ghcr.io/maelvl
 To run the UI:
 
 ```sh
-docker run -d --restart=always --name print-your-cert-ui --net=host -p 0.0.0.0:8080:8080 -v $HOME/.kube/config:/root/.kube/config github.com/maelvls/print-your-cert-ui:latest print-your-cert --issuer ca-issuer --listen 0.0.0.0:8080
+docker run -d --restart=always --name print-your-cert-ui --net=host -p 0.0.0.0:8080:8080 -v $HOME/.kube/config:/root/.kube/config ghcr.io/maelvls/print-your-cert-ui:latest --issuer ca-issuer --listen 0.0.0.0:8080
 ```
 
 ### Build `ghcr.io/maelvls/print-your-cert-controller:latest`
@@ -115,7 +115,7 @@ docker run -d --restart=always --name brother_ql_web --privileged -v /dev/bus/us
 On the Pi (over SSH), when running `brother_ql` with the following command:
 
 ```text
-docker run --privileged -v /dev/bus/usb:/dev/bus/usb -it --rm github.com/maelvls/print-your-cert/ui:latest brother_ql
+docker run --privileged -v /dev/bus/usb:/dev/bus/usb -it --rm ghcr.io/maelvls/print-your-cert-ui:latest brother_ql
 ```
 
 you may hit the following message:
@@ -126,10 +126,13 @@ usb.core.USBError: [Errno 16] Resource busy
 
 I found that two reasons lead to this message:
 
-1. The primary reason is that libusb-1.0 is installed on the host (on the Pi, that's Debian) and needs
-   to be removed, and replaced with libusb-0.1. You can read more about this in https://github.com/pyusb/pyusb/issues/391.
-2. A second reason is that the label settings aren't correct (e.g., you have select
-   the black/red tape but the black-only tape is installed in the printer).
+1. The primary reason is that libusb-1.0 is installed on the host (on the
+   Pi, that's Debian) and needs to be removed, and replaced with
+   libusb-0.1. You can read more about this in
+   <https://github.com/pyusb/pyusb/issues/391>.
+2. A second reason is that the label settings aren't correct (e.g., you
+   have select the black/red tape but the black-only tape is installed in
+   the printer).
 
 ### From the web UI: `No such file or directory: '/dev/usb/lp1'`
 
@@ -207,7 +210,7 @@ sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1
 sudo sysctl -w net.ipv4.ip_forward=1
 ```
 
-## Build and push the image `github.com/maelvls/print-your-cert/ui:latest`
+## Build and push the image `ghcr.io/maelvls/print-your-cert-ui:latest`
 
 Install Docker, vim and jq on the Pi:
 
@@ -226,7 +229,7 @@ sudo apt install -y qemu qemu-user-static
 docker buildx create --name mybuilder
 docker buildx use mybuilder
 docker buildx inspect --bootstrap
-docker buildx build --platform linux/arm64/v8 -t github.com/maelvls/print-your-cert/ui:latest -o type=docker,dest=print-your-cert-ui.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert-ui.tar
+docker buildx build --platform linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-ui:latest -o type=docker,dest=print-your-cert-ui.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert-ui.tar
 ```
 
 ## Testing pem-to-png
