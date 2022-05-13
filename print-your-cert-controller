@@ -2,7 +2,11 @@
 
 set -uo pipefail
 
-#apiserver=$(kubectl config view --minify --flatten -ojson | jq '.clusters[0].cluster.server' -r)
+# For testing purposes, that allows me to run ./print-your-cert-controller
+# without having to put pem-to-png in my PATH.
+export PATH="$PATH:$PWD"
+
+printf "print-your-cert-controller is now watching certificates.\n"
 
 kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
     annotation_value_print=$(jq -r '.metadata.annotations."print" | select(.)' <<<"$cert")
@@ -45,12 +49,12 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
 
         printf "%s: printing.\n" "$(jq -r .metadata.name <<<"$cert")"
 
-        if ! ./pem-to-png <<<"$pem"; then
+        if ! pem-to-png <<<"$pem"; then
             printf "%s: failed to generate front.png and back.png.\n" "$(jq -r .metadata.name <<<"$cert")"
             continue
         fi
 
-        if ! out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 --rotate 90 front.png 2>&1); then
+        if ! out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 front.png 2>&1); then
             printf "%s: failed to print: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
             if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
                 -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \

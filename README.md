@@ -87,19 +87,27 @@ docker buildx build -f Dockerfile.ui --platform linux/arm64/v8 -t ghcr.io/maelvl
 To run the UI:
 
 ```sh
-docker run -d --restart=always --name print-your-cert-ui --net=host -p 0.0.0.0:8080:8080 -v $HOME/.kube/config:/root/.kube/config ghcr.io/maelvls/print-your-cert-ui:latest --issuer ca-issuer --listen 0.0.0.0:8080
+docker run -d --restart=always --name print-your-cert-ui --net=host -v $HOME/.kube/config:/root/.kube/config ghcr.io/maelvls/print-your-cert-ui:latest --issuer ca-issuer --issuer-kind ClusterIssuer --listen 0.0.0.0:8080
 ```
 
 ### Build `ghcr.io/maelvls/print-your-cert-controller:latest`
 
+Multi-arch:
+
 ```sh
-docker buildx build -f Dockerfile.controller --platform amd64,linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-controller:latest -o type=docker,dest=print-your-cert-controller.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert-controller.tar
+docker buildx build -f Dockerfile.controller --platform amd64,linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-controller:latest --push .
+```
+
+Build directly to the Pi:
+
+```sh
+docker buildx build -f Dockerfile.controller --platform linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-controller:latest -o type=docker,dest=print-your-cert-controller.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert-controller.tar
 ```
 
 Run the controller:
 
 ```sh
-docker run  -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb ghcr.io/maelvls/print-your-cert-controller:latest
+docker run -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb -v $HOME/.kube/config:/root/.kube/config --net=host ghcr.io/maelvls/print-your-cert-controller:latest
 ```
 
 Run the "debug" printer UI (brother_ql_web):
