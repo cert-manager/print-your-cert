@@ -23,7 +23,7 @@
       {{end}} {{if .Certificate}}
       <div>{{template "certificate" .Certificate}}</div>
       <div>
-        <form method="POST" action="/">
+        <form method="POST" action="/print">
           <input name="name" type="text" value="{{.Name}}" hidden />
           <input name="email" type="text" value="{{.Email}}" hidden />
           <input
@@ -36,7 +36,11 @@
             {{end}}
           />
         </form>
-        {{if .AlreadyPrinted}}
+        {{if .Certificate}}
+        <form method="GET" action="/download">
+          <input name="email" type="text" value="{{.Email}}" hidden />
+          <input type="submit" value="Dowload in PEM format" />
+        </form>
         <p style="color: darkgreen">
           The certificate has already been printed.
         </p>

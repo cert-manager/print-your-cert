@@ -105,7 +105,7 @@ var tmpl = template.Must(template.ParseFS(content, "*.html"))
 func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
-			http.Error(w, "404 not found.", http.StatusNotFound)
+			http.Error(w, "The path %s contains nothing.", http.StatusNotFound)
 			return
 		}
 
@@ -120,18 +120,21 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		// Happily return early if the name or email haven't been
 		// provided yet.
 		if personName == "" && email == "" {
+			w.WriteHeader(400)
 			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Message: "Welcome! To get your certificate, fill in your name and email."})
 			return
 		}
 
 		// Let's check that both the email and name have been entered.
 		if personName == "" && email != "" || personName != "" && email == "" {
+			w.WriteHeader(400)
 			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Message: "Please fill in both the email and name."})
 			log.Printf("GET /: the user has given an empty name %q or an empty email %q", personName, email)
 			return
 		}
 
 		if !valid(email) {
+			w.WriteHeader(400)
 			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "The email is invalid."})
 			log.Printf("GET /: the user %q has given an invalid email %q", personName, email)
 			return
@@ -144,6 +147,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		commonName := fmt.Sprintf("%s <%s>", personName, email)
 		if len(commonName) > 64 {
 			msg := fmt.Sprintf("Oops, the common name formed using your name and email (%s) counts as %d bytes which goes beyond the common name limit of 64 bytes. Could you try abbreviating some part of your name and try again?", commonName, len(commonName))
+			w.WriteHeader(400)
 			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: msg})
 			log.Printf("GET /: the user %q has given a common name %q that is above the 64 bytes limit", personName, commonName)
 			return
@@ -178,10 +182,12 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 				return
 			}
 
+			w.WriteHeader(201)
 			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Message: "A certificate was successfully requested. Reload to see the progress."})
 			log.Printf("GET /: successfully created a certificate named %s in namespace %s for '%s <%s>' in Kubernetes", certName, *namespace, personName, email)
 			return
 		case err != nil:
+			w.WriteHeader(500)
 			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "Failed getting the Certificate in Kubernetes."})
 			log.Printf("GET /: while getting the Certificate %s in namespace %s in Kubernetes: %v", certName, *namespace, err)
 			return
@@ -199,6 +205,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		// Success: we found the Certificate in Kubernetes. Let us see
 		// if it is ready.
 		if !isReady(cert) {
+			w.WriteHeader(423)
 			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Message: "Your certificate is not ready yet. Reload to see the progress.", Debug: debugMsg})
 			log.Printf("GET /: the requested certificate %s in namespace %s is not ready yet.", certName, *namespace)
 			return
@@ -207,7 +214,8 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		// Let's show the user the Certificate.
 		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
 		if err != nil {
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "A certificate already exists, but the Secret does not exist.", Debug: debugMsg})
+			w.WriteHeader(423)
+			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "A certificate already exists, but the Secret does not exist. Try again.", Debug: debugMsg})
 			log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, *namespace, cert.Spec.SecretName)
 			return
 		}
@@ -216,7 +224,8 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		// certificate from the Secret.
 		certPem, ok := secret.Data["tls.crt"]
 		if !ok {
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "Internal issue with the stored certificate in Kubernetes.", Debug: debugMsg})
+			w.WriteHeader(423)
+			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "Internal issue with the stored certificate in Kubernetes. Try again.", Debug: debugMsg})
 			log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
 			return
 		}
@@ -225,6 +234,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		certBlock, _ := pem.Decode(certPem)
 		x509Cert, err := x509.ParseCertificate(certBlock.Bytes)
 		if err != nil {
+			w.WriteHeader(500)
 			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "Internal issue with parsing the issued certificate when parsing it.", Debug: debugMsg})
 			log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s contains in its tls.crt field an invalid PEM certificate", certName, *namespace, cert.Spec.SecretName)
 			return
@@ -245,12 +255,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 			errMsg = "Warning: the name is different from the name in the certificate we already have for this email. Each certificate is associate to an email, and although you cannot change the name of a certificate once it is issued, but you can use another email to create a new certificate."
 		}
 		certificateHTMLData := certificateToHTML(x509Cert)
-		err = tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Certificate: &certificateHTMLData, Error: errMsg, CanPrint: canPressPrintButton, MarkedToBePrinted: stillToBePrinted, AlreadyPrinted: alreadyPrinted, Debug: debugMsg})
-		if err != nil {
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "An unexpected error happened.", Debug: debugMsg})
-			log.Printf("GET /: failure while executing the template for landing.html: %v", err)
-			return
-		}
+		_ = tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Certificate: &certificateHTMLData, Error: errMsg, CanPrint: canPressPrintButton, MarkedToBePrinted: stillToBePrinted, AlreadyPrinted: alreadyPrinted, Debug: debugMsg})
 	}
 }
 
@@ -266,9 +271,10 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 func printPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/print" {
-			http.Error(w, "404 not found.", 404)
+			http.Error(w, "The path %s contains nothing.", http.StatusNotFound)
 			return
 		}
+
 		if r.Method != "POST" {
 			w.WriteHeader(400)
 			http.Error(w, "Only POST method is supported for path /print.", http.StatusMethodNotAllowed)
@@ -366,13 +372,11 @@ func download(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 
 		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
 		if err != nil {
-			http.Error(w, "A certificate already exists, but the Secret does not exist. Try again later.", 423)
+			http.Error(w, "A certificate already exists, but the secret does not exist. Try again later.", 423)
 			log.Printf("GET /download: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, *namespace, cert.Spec.SecretName)
 			return
 		}
 
-		// Let's show the user the Certificate. First, parse the X.509
-		// certificate from the Secret.
 		certPem, ok := secret.Data["tls.crt"]
 		if !ok {
 			http.Error(w, "The Secret does not contain a certificate, try again later.", 423)
@@ -384,7 +388,7 @@ func download(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 		// Give the PEM-encoded certificate to the user.
 		w.WriteHeader(200)
 		w.Header().Set("Content-Type", "application/x-pem-file")
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pem", certName))
+		w.Header().Set("Content-Disposition", `attachment; filename="cert.pem"`)
 		w.Header().Set("Content-Length", strconv.Itoa(len(certPem)))
 		w.Write(certPem)
 	}
@@ -548,6 +552,8 @@ func main() {
 	}
 
 	http.HandleFunc("/", landingPage(kclient, cmclient))
+	http.HandleFunc("/print", printPage(kclient, cmclient))
+	http.HandleFunc("/download", download(kclient, cmclient))
 	http.HandleFunc("/list", listPage(kclient, cmclient))
 
 	fmt.Printf("Listening on http://" + *listen + ".\n")
