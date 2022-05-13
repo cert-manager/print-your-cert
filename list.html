@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content="{{.Refresh}}">
+    <style></style>
+  </head>
+  <body>
+    <h1>Last certificates that were printed</h1>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Common name</th>
+                <th>State</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Certificates}}
+            <tr>
+                <td>{{.CommonName}}</td>
+                <td>{{.State}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+  </body>
+</html>

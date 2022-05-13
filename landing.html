@@ -26,10 +26,30 @@
         <form method="POST" action="/">
           <input name="name" type="text" value="{{.Name}}" hidden />
           <input name="email" type="text" value="{{.Email}}" hidden />
-          <input type="submit" value="Print your certificate" />
+          <input
+            type="submit"
+            value="Print your certificate"
+            {{if
+            not
+            .CanPrint}}
+            disabled
+            {{end}}
+          />
         </form>
+        {{if .AlreadyPrinted}}
+        <p style="color: darkgreen">
+          The certificate has already been printed.
+        </p>
+        {{end}} {{if .MarkedToBePrinted}}
+        <p style="color: darkgreen">
+          The certificate is waiting to be printed.
+        </p>
+        {{end}}
       </div>
       {{end}}
     </div>
+    {{if .Debug}}
+    <pre>{{.Debug}}</pre>
+    {{end}}
   </body>
 </html>

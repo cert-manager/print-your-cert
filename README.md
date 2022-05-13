@@ -37,10 +37,10 @@ Make sure cert-manager is running:
 ```sh
 kubectl apply -f- <<EOF
 apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
+kind: Issuer
 metadata:
   name: self-signed
-  namespace: default
+  namespace: cert-manager
 spec:
   selfSigned: {}
 ---
@@ -48,7 +48,7 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: ca
-  namespace: default
+  namespace: cert-manager
 spec:
   isCA: true
   privateKey:
@@ -61,10 +61,10 @@ spec:
     kind: Issuer
 ---
 apiVersion: cert-manager.io/v1
-kind: Issuer
+kind: ClusterIssuer
 metadata:
   name: ca-issuer
-  namespace: default
+  namespace: cert-manager
 spec:
   ca:
     secretName: ca

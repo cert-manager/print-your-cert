@@ -32,7 +32,9 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
 
         ./pem-to-png <<<"$pem"
 
-        brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 --rotate 90 front.png
+        timg front.png
+
+        #brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 --rotate 90 front.png
         #brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back.png
 
         # Now that the certificate is printed, we can update the status of
