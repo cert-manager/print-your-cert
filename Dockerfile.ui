@@ -1,0 +1,4 @@
+FROM alpine:edge
+ARG TARGETARCH
+COPY print-your-cert-ui-$TARGETARCH /usr/local/bin/print-your-cert-ui
+ENTRYPOINT ["print-your-cert-ui"]

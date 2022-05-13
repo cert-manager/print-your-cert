@@ -1,19 +1,23 @@
 # The Brother printer with the Pi
 
+The frontend URL is <http://print-your-cert.mael.pw/>.
+
 ## Test things
 
 For anyone who is in the cert-manager org and wants to test or debug
 things:
 
 - [Install tailscale](https://tailscale.com/download/).
-- Run `tailscale up`, it should open something in your browser → "Sign in with GitHub" → Authorize Tailscale → Multi-user Tailnet cert-manager.
-- You can test the "front end" UI at <http://100.100.85.57/>.
-- You can test that the printer works at <http://100.100.85.57:8013/>.
+- Run `tailscale up`, it should open something in your browser → "Sign in
+  with GitHub" → Authorize Tailscale → Multi-user Tailnet cert-manager.
+- If <http://print-your-cert.mael.pw/> doesn't work, then the frontend UI
+  is at <http://100.121.173.5:8080/>.
+- You can test that the printer works at <http://100.121.173.5:8013/>.
 - You can SSH into the Pi (which runs a Kubernetes cluster) as long as
   you are a member of the cert-manager org:
 
   ```sh
-  ssh pi@$(tailscale ip -4 pi)
+  ssh pi@100.121.173.5
   ```
 
   > The public keys have been added to the `authorized_keys` of the Pi.
@@ -67,16 +71,41 @@ spec:
 EOF
 ```
 
-### print-your-cert-back
+### Build `ghcr.io/maelvls/print-your-cert-ui:latest`
 
 ```sh
-docker run -d --name print-your-cert-back --privileged -v /dev/bus/usb:/dev/bus/usb -it --rm -p 0.0.0.0:8013:8013 github.com/maelvls/print-your-cert:latest brother_ql_web
+# Multi-arch pushed to registry:
+GOARCH=arm64 go build -o print-your-cert-ui-arm64 .
+GOARCH=amd64 go build -o print-your-cert-ui-amd64 .
+docker buildx build -f Dockerfile.ui --platform amd64,linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-ui:latest --push
+
+# Quicker: push directly to the Pi:
+GOARCH=arm64 go build -o print-your-cert-ui-arm64 .
+docker buildx build -f Dockerfile.ui --platform linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-ui:latest -o type=docker,dest=print-your-cert-ui.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert-ui.tar
 ```
 
-### print-your-cert-front
+To run the UI:
 
 ```sh
-docker run -d --name print-your-cert-front --net=host -v $HOME/.kube/config:/root/.kube/config github.com/maelvls/print-your-cert-front:latest print-your-cert --issuer ca-issuer --listen 0.0.0.0:80
+docker run -d --restart=always --name print-your-cert-ui --net=host -p 0.0.0.0:8080:8080 -v $HOME/.kube/config:/root/.kube/config github.com/maelvls/print-your-cert-ui:latest print-your-cert --issuer ca-issuer --listen 0.0.0.0:8080
+```
+
+### Build `ghcr.io/maelvls/print-your-cert-controller:latest`
+
+```sh
+docker buildx build -f Dockerfile.controller --platform amd64,linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-controller:latest -o type=docker,dest=print-your-cert-controller.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert-controller.tar
+```
+
+Run the controller:
+
+```sh
+docker run  -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb ghcr.io/maelvls/print-your-cert-controller:latest
+```
+
+Run the "debug" printer UI (brother_ql_web):
+
+```sh
+docker run -d --restart=always --name brother_ql_web --privileged -v /dev/bus/usb:/dev/bus/usb -p 0.0.0.0:8013:8013 ghcr.io/maelvls/print-your-cert-controller:latest brother_ql_web
 ```
 
 ## Troubleshooting
@@ -86,7 +115,7 @@ docker run -d --name print-your-cert-front --net=host -v $HOME/.kube/config:/roo
 On the Pi (over SSH), when running `brother_ql` with the following command:
 
 ```text
-docker run --privileged -v /dev/bus/usb:/dev/bus/usb -it --rm github.com/maelvls/print-your-cert:latest brother_ql
+docker run --privileged -v /dev/bus/usb:/dev/bus/usb -it --rm github.com/maelvls/print-your-cert/ui:latest brother_ql
 ```
 
 you may hit the following message:
@@ -170,7 +199,15 @@ curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.c
 
 Then I install Tailscale, and log in using my home account `mael65@gmail.com` and share the device to the Tail-net cert-manager@github.
 
-## Build and push the image `github.com/maelvls/print-your-cert:latest`
+I also need to enable IPv4 forwarding:
+
+```sh
+sudo perl -ni -e 'print if \!/^net.ipv4.ip_forward=1/d' /etc/sysctl.conf
+sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1
+sudo sysctl -w net.ipv4.ip_forward=1
+```
+
+## Build and push the image `github.com/maelvls/print-your-cert/ui:latest`
 
 Install Docker, vim and jq on the Pi:
 
@@ -189,7 +226,7 @@ sudo apt install -y qemu qemu-user-static
 docker buildx create --name mybuilder
 docker buildx use mybuilder
 docker buildx inspect --bootstrap
-docker buildx build --platform linux/arm64/v8 -t github.com/maelvls/print-your-cert:latest -o type=docker,dest=print-your-cert.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert.tar
+docker buildx build --platform linux/arm64/v8 -t github.com/maelvls/print-your-cert/ui:latest -o type=docker,dest=print-your-cert-ui.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert-ui.tar
 ```
 
 ## Testing pem-to-png
@@ -204,7 +241,10 @@ read
 brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 pem-to-png.png
 ```
 
-# Public IP on my machine with f1.micro + WireGuard
+## [UNUSED] Public IP on my machine with f1.micro + WireGuard
+
+> I ended up not using the "manual" Wireguard setup. Instead, I use Caddy on the
+> VM, and Tailscale between the VM and the Pi.
 
 Based on https://blog.kmassada.com/quickstart-wireguard-beryl-gcp/ (2020).
 
@@ -287,7 +327,7 @@ EOF
 sudo wg-quick up wg0
 ```
 
-## Another way: Tailscale + Caddy
+## Tailscale + Caddy
 
 ```sh
 gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- bash <<'EOF'
@@ -309,4 +349,3 @@ CADDY
 sudo systemctl restart caddy.service
 EOF
 ```
-

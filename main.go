@@ -35,7 +35,9 @@ var (
 	kubeconfigContext = flag.String("context", "", "Allows you to specify the context to use in the kubeconfig file.")
 	kubeconfig        = flag.String("kubeconfig", "", "Allows you to specify the path to the kubeconfig file.")
 	namespace         = flag.String("namespace", "default", "Allows you to specify the namespace to use when creating the certificates.")
-	issuer            = flag.String("issuer", "", "Allows you to specify the issuer to use when creating the certificates. The issuer must be in the same namespace as the namespace given with --namespace.")
+	issuer            = flag.String("issuer", "", "Name of the issuer resource to use when creating the certificates. When --issuer-kind=Issuer is used (which is the default), the issuer resource must be in the same namespace as in --namespace.")
+	issuerKind        = flag.String("issuer-kind", "Issuer", "This flag can be used to select the namespaced 'Issuer', or to select an 'external' issuer, e.g., 'AWSPCAIssuer'.")
+	issuerGroup       = flag.String("issuer-group", "cert-manager.io", "This flag allows you to give a different API group when using an 'external' issuer, e.g., 'awspca.cert-manager.io'.")
 )
 
 // Config attempts to load the in-cluster config and falls back to using
@@ -151,8 +153,9 @@ func hello() func(http.ResponseWriter, *http.Request) {
 						CommonName: commonName,
 						SecretName: certName,
 						IssuerRef: cmmetav1.ObjectReference{
-							Name: *issuer,
-							Kind: "Issuer",
+							Name:  *issuer,
+							Kind:  *issuerKind,
+							Group: *issuerGroup,
 						},
 					},
 				}, metav1.CreateOptions{})
