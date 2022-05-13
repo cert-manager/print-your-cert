@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -uo pipefail
 
 #apiserver=$(kubectl config view --minify --flatten -ojson | jq '.clusters[0].cluster.server' -r)
 
@@ -9,7 +9,7 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
     condition_status_ready=$(jq -r '.status.conditions[]? | select(.type == "Ready") | .status' <<<"$cert")
     condition_status_printed=$(jq -r '.status.conditions[]? | select(.type == "Printed") |  .status' <<<"$cert")
 
-    printf "%s: reconciling. (state: $annotation_value_print,$condition_status_ready,$condition_status_printed)\n" "$(jq -r .metadata.name <<<"$cert")"
+    printf "%s: reconciling. (state: annotation=print:$annotation_value_print, Ready=$condition_status_ready, Printed=$condition_status_printed)\n" "$(jq -r .metadata.name <<<"$cert")"
     case $annotation_value_print,$condition_status_ready,$condition_status_printed in
     ,*,*)
         printf "%s: the certificate does not have the 'print' annotation, skipping.\n" "$(jq -r .metadata.name <<<"$cert")"
@@ -19,29 +19,63 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
         printf "%s: the certificate does not have the 'Ready' condition yet, skipping.\n" "$(jq -r .metadata.name <<<"$cert")"
         continue
         ;;
+    true,*,)
+        printf "%s: certificate has the annotation, let's set the 'Printed' condition to 'False' until it is printed.\n" "$(jq -r .metadata.name <<<"$cert")"
+        if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
+            -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
+            -d '[{"op": "add", "path": "/status/conditions", "value":[{
+                "type": "Printed",
+                "status": "False",
+                "reason": "Pending",
+                "message": "The print-your-cert-controller has acknowledged this certificate, and will print it shortly."
+            }]}]' 2>&1); then
+            printf "%s: failed to set the 'Printed' condition to 'False': %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
+        fi
+        continue
+        ;;
     *,*,True)
         printf "%s: the certificate has already been printed, skipping.\n" "$(jq -r .metadata.name <<<"$cert")"
         continue
         ;;
 
-    true,True,*)
-        printf "%s: is ready to be printed and was not printed before.\n" "$(jq -r .metadata.name <<<"$cert")"
+    true,True,False)
+        printf "%s: has the Ready=True condition and can now be printed.\n" "$(jq -r .metadata.name <<<"$cert")"
+
         pem=$(jq -r '.spec.secretName' <<<"$cert" | xargs kubectl get secret -ojson | jq -r '.data."tls.crt"' | base64 -d)
 
         printf "%s: printing.\n" "$(jq -r .metadata.name <<<"$cert")"
 
-        ./pem-to-png <<<"$pem"
+        if ! ./pem-to-png <<<"$pem"; then
+            printf "%s: failed to generate front.png and back.png.\n" "$(jq -r .metadata.name <<<"$cert")"
+            continue
+        fi
 
-        timg front.png
+        if ! out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 --rotate 90 front.png 2>&1); then
+            printf "%s: failed to print: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
+            if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
+                -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
+                -d '[{"op": "add", "path": "/status/conditions", "value":[{
+                "type": "Printed",
+                "status": "False",
+                "reason": "Error",
+                "message": "brother_ql: '"$(tail -1 <<<"$out")"'"
+            }]}]' 2>&1); then
+                printf "%s: failed to set the 'Printed' condition to 'False': %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
+            fi
+            continue
+        fi
 
         #brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 --rotate 90 front.png
         #brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back.png
 
         # Now that the certificate is printed, we can update the status of
         # the certificate.
-        kubectl curl -sS -k -H "Content-Type: application/json-patch+json" \
+        if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
             -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
-            -d '[{"op": "add", "path": "/status/conditions", "value":[{"type": "Printed", "status": "True"}]}]' >/dev/null
+            -d '[{"op": "add", "path": "/status/conditions", "value":[{"type": "Printed", "status": "True"}]}]' 2>&1); then
+            printf "%s: failed to generate front.png and back.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
+        fi
+
         continue
         ;;
     esac

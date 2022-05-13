@@ -105,7 +105,7 @@ var tmpl = template.Must(template.ParseFS(content, "*.html"))
 func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
-			http.Error(w, "The path %s contains nothing.", http.StatusNotFound)
+			http.Error(w, fmt.Sprintf("The path %s contains is expected to be /.", r.URL.Path), http.StatusNotFound)
 			return
 		}
 
@@ -271,13 +271,12 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 func printPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/print" {
-			http.Error(w, "The path %s contains nothing.", http.StatusNotFound)
+			http.Error(w, fmt.Sprintf("The path %s is expected to be /print", r.URL.Path), http.StatusNotFound)
 			return
 		}
 
 		if r.Method != "POST" {
-			w.WriteHeader(400)
-			http.Error(w, "Only POST method is supported for path /print.", http.StatusMethodNotAllowed)
+			http.Error(w, "Only the POST method is supported for the path /print.", http.StatusMethodNotAllowed)
 			return
 		}
 
@@ -341,7 +340,8 @@ func printPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) fun
 func download(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
-			fmt.Fprintf(w, "Only GET is supported supported for %s.\n", r.URL.Path)
+			http.Error(w, fmt.Sprintf("Only the GET method is supported supported on the path %s.\n", r.URL.Path), http.StatusMethodNotAllowed)
+			return
 		}
 
 		email := r.URL.Query().Get("email")
@@ -401,7 +401,8 @@ func download(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 func listPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
-			fmt.Fprintf(w, "Only GET is supported supported for %s.\n", r.URL.Path)
+			http.Error(w, fmt.Sprintf("Only the GET method is supported supported on the path %s.\n", r.URL.Path), http.StatusMethodNotAllowed)
+			return
 		}
 
 		refreshStr := r.URL.Query().Get("refresh")

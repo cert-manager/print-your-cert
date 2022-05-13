@@ -41,6 +41,7 @@
           <input name="email" type="text" value="{{.Email}}" hidden />
           <input type="submit" value="Dowload in PEM format" />
         </form>
+        {{end}} {{if .AlreadyPrinted}}
         <p style="color: darkgreen">
           The certificate has already been printed.
         </p>

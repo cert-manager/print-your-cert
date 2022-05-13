@@ -28,5 +28,3 @@ convert -size 984x696 canvas:white \
     -background None -layers Flatten front.png
 
 qrencode --type PNG --margin 0 -o - </tmp/crt | convert - -monochrome -filter point -interpolate nearest -resize 696x696 back.png
-
-echo "PNG front.png and back.png were saved" >&2
