@@ -1,24 +1,43 @@
 # The "Print you certificate!" experiment at the cert-manager booth (KubeCon EU 2022 in Valencia)
 
+⚠️  The URLs an IPs presented in this README are guarenteed to work from 18 to
+20 May 2022, but may stop working afterwards.
+
 When visiting the cert-manager booth, you will be welcomed and one of the staff
 may suggest to visit a QR code from their phone to participate to the "Print
 your certificate!" experiment.
 
-On your phone, the participant opens the QR code. A bare-bone UI prompts a name
-and email. After clicking "Get my certificate", the participant re-loads the
-page until the certificate is issued, and eventually, a button "Print your
-certificate" appears.
+On your phone, the participant opens the QR code. The participant lands on a UI
+prompting for a name and email:
 
-After clicking "Print your certificate", the printer, installed on the booth,
-starts printing two labels: one for the front side, and one for the back side.
-The booth staff sticks the two printed labels onto a black-colored card (format
-A7), and uses the wax gun and the wax stamp to stamp the card.
+<img alt="landing-1" src="https://user-images.githubusercontent.com/2195781/168419133-0b1f814a-a18d-426b-8766-f1908e965707.png" width="500"/>
+
+After clicking "Get my certificate", the participant isss prompted to reload the
+page.
+
+<img alt="landing-3" src="https://user-images.githubusercontent.com/2195781/168419130-a177aecf-5a5f-4ac4-8178-2e34c16309d7.png" width="500"/>
+
+After reloading (the issuance takes less than a second), the participant can see
+a receipt of their certificate. A button "Print your certificate" appears:
+
+<img alt="landing-4" src="https://user-images.githubusercontent.com/2195781/168419128-1684ed0d-641c-4074-8d63-69e379bdf697.png" width="500"/>
+
+When clicking on "Print your certificate", the participant is told that their
+certificate will shortly be printed:
+
+<img alt="print-1" src="https://user-images.githubusercontent.com/2195781/168419127-d47e6a9c-1f42-4200-811f-9053b275d17e.png" width="500"/>
+
+The printer, installed on the booth, starts printing two labels: one for the
+front side, and one for the back side. The booth staff sticks the two printed
+labels onto a black-colored card (format A7), and uses the wax gun and the wax
+stamp to stamp the card.
 
 > Because the label is made of plastic, and the wax is hot, it is advised to the
 > staff not to put stamp in contact of the label.
 
-⚠️  This URLs an IPs presented in this README are guarenteed to work from 18 to
-20 May 2022, but may stop working afterwards.
+When going back to their certificate, the participant notices that the button "print your certificate" is grayed out:
+
+<img alt="landing-5" src="https://user-images.githubusercontent.com/2195781/168419125-9fa12189-6a17-4578-9a3d-a6f510867881.png" width="500"/>
 
 The front-side label looks like this:
 <img src="https://user-images.githubusercontent.com/2195781/168418627-0952377f-5a1d-4dbe-a41f-80cf99430b77.png" width="400" alt="front"/>
@@ -45,11 +64,22 @@ https://print-your-cert.maelvls.dev/certificate.html?pem=...
                                         inline PEM-encoded certificate
 ```
 
+On the certificate page, the participant can also see their certificate by
+clicking on the button "Print your certificate". The PEM-encoded certificate is
+shown in the browser:
+
+<img alt="download" src="https://user-images.githubusercontent.com/2195781/168419122-1bf3d0dd-c474-4d47-a55e-56980ed16441.png" width="500"/>
+
+On the booth, we have a 42-inch display showing the list of certificates
+(<https://print-your-cert.mael.pw/list>):
+
+<img alt="list" src="https://user-images.githubusercontent.com/2195781/168419219-fb3e5eb7-672e-4792-9ac3-40cf8e6b251d.png" width="300"/>
+
 And that's it: you have a certificate that proves that you were at the KubeCon
 cert-manager booth! The CA used during the conference will be available at some
 point so that people can verify the signature.
 
-## Test things
+## Staff: test things
 
 For anyone who is in the cert-manager org and wants to test or debug
 things:
