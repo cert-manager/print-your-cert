@@ -56,8 +56,8 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
             continue
         fi
 
-        if ! out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 front.png 2>&1); then
-            printf "%s: failed to print: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
+        if ! out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 --rotate 90 front.png 2>&1); then
+            printf "%s: failed to print front.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
             if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
                 -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
                 -d '[{"op": "add", "path": "/status/conditions", "value":[{
@@ -71,8 +71,20 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
             continue
         fi
 
-        #brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 --rotate 90 front.png
-        #brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back.png
+        if ! out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back.png 2>&1); then
+            printf "%s: failed to print back.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
+            if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
+                -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
+                -d '[{"op": "add", "path": "/status/conditions", "value":[{
+                "type": "Printed",
+                "status": "False",
+                "reason": "Error",
+                "message": "brother_ql: '"$(tail -1 <<<"$out")"'"
+            }]}]' 2>&1); then
+                printf "%s: failed to set the 'Printed' condition to 'False': %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
+            fi
+            continue
+        fi
 
         # Now that the certificate is printed, we can update the status of
         # the certificate.
