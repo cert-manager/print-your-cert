@@ -1,6 +1,53 @@
-# The Brother printer with the Pi
+# The "Print you certificate!" experiment at the cert-manager booth (KubeCon EU 2022 in Valencia)
 
-The frontend URL is <http://print-your-cert.mael.pw/>.
+When visiting the cert-manager booth, you will be welcomed and one of the staff
+may suggest to visit a QR code from their phone to participate to the "Print
+your certificate!" experiment.
+
+On your phone, the participant opens the QR code. A bare-bone UI prompts a name
+and email. After clicking "Get my certificate", the participant re-loads the
+page until the certificate is issued, and eventually, a button "Print your
+certificate" appears.
+
+After clicking "Print your certificate", the printer, installed on the booth,
+starts printing two labels: one for the front side, and one for the back side.
+The booth staff sticks the two printed labels onto a black-colored card (format
+A7), and uses the wax gun and the wax stamp to stamp the card.
+
+> Because the label is made of plastic, and the wax is hot, it is advised to the
+> staff not to put stamp in contact of the label.
+
+⚠️  This URLs an IPs presented in this README are guarenteed to work from 18 to
+20 May 2022, but may stop working afterwards.
+
+The front-side label looks like this:
+<img src="https://user-images.githubusercontent.com/2195781/168418627-0952377f-5a1d-4dbe-a41f-80cf99430b77.png" width="400" alt="front"/>
+
+The back-side label looks like this:
+<img src="https://user-images.githubusercontent.com/2195781/168418632-8650a78a-d540-4831-9238-dd59b9994a2b.png" width="300" alt="back"/>
+
+The back-side labels is a QR code containing the PEM-encoded certificate that
+was issued. Since we didn't find any good use for TLS, we didn't include the
+private key.
+
+The experience is terrible with this raw PEM certificate. A better experience
+would be to store in the QR code a URL that has the PEM-encoded certificate as a
+query parameter. This would be a long-lasting URL (people may want to open it in
+2 years from now), which means I could not use <print-your-cert.mael.pw> for
+that, which this URL will probably go away when the domain expires.
+
+Ideally, the URL would lead to a static website with some Javascript that would
+show the certificate, e.g.,:
+
+```text
+https://print-your-cert.maelvls.dev/certificate.html?pem=...
+                                                     ^^^^^^^^
+                                        inline PEM-encoded certificate
+```
+
+And that's it: you have a certificate that proves that you were at the KubeCon
+cert-manager booth! The CA used during the conference will be available at some
+point so that people can verify the signature.
 
 ## Test things
 
@@ -252,31 +299,50 @@ read
 brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 pem-to-png.png
 ```
 
-## [UNUSED] Public IP on my machine with f1.micro + WireGuard
+## Set up the tunnel between the Internet and the Pi
 
-> I ended up not using the "manual" Wireguard setup. Instead, I use Caddy on the
-> VM, and Tailscale between the VM and the Pi.
+> At first, I tried using Wireguard to have a `wg0` interface on the Pi with a
+> public IP (like <http://hoppy.network> does). I documented this (failed)
+> process in
+> [public-ip-on-my-machine-using-wireguard](https://hackmd.io/@maelvls/public-ip-on-my-machine-using-wireguard).
 
-Based on https://blog.kmassada.com/quickstart-wireguard-beryl-gcp/ (2020).
+I want to expose the print-your-cert-ui on the Internet on
+<https://print-your-cert.mael.pw>, so I need to set up a TCP tunnel towards the
+Pi. I use Tailscale and Caddy on a GCP e2-micro VM (because f1-micro isn't
+available in Spain).
 
-```shell=sh
-gcloud iam service-accounts create secret-accessor \
-  --description "SA for accessing Secret Manager secrets" \
-  --display-name "secret accessor" \
-  --project jetstack-mael-valais
-gcloud projects add-iam-policy-binding jetstack-mael-valais \
-  --member serviceAccount:secret-accessor@jetstack-mael-valais.iam.gserviceaccount.com \
-  --role roles/secretmanager.secretAccessor \
-  --project jetstack-mael-valais
+```text
+
+https://print-your-cert.mael.pw
+              |
+              |
+              v  34.175.62.123 (eth0)
+    +------------------+
+    |  VM "wireguard"  |
+    |                  |
+    +------------------+
+              |  100.70.50.97 (tailscale0)
+              |
+              |
+              |
+              v  100.121.173.5 (tailscale0)
+    +-------------------+
+    |       Pi          |
+    |                   |
+    |     :8080 (UI)    |
+    +-------------------+
 ```
 
-```shell=sh
-gcloud compute firewall-rules create allow-wireguard \
+To create the VM "wireguard" (which I should have called "tailscale") I used the
+following commands:
+
+```shell
+gcloud compute firewall-rules create allow-tailscale \
     --project jetstack-mael-valais \
     --network default \
     --action allow \
     --direction ingress \
-    --rules udp:51820 \
+    --rules udp:41641 \
     --source-ranges 0.0.0.0/0
 gcloud compute instances create wireguard \
     --project jetstack-mael-valais \
@@ -289,56 +355,36 @@ gcloud compute instances create wireguard \
     --zone=europe-southwest1-c
 ```
 
-Then, I went to <https://google.domains> and added the record:
+Then, I copy-pasted the IP into the mael.pw zone:
 
-```dns
-print-your-cert.mael.pw.  300  IN   A   34.175.254.25
-```
+1. Copy the IP:
 
-To get the IP, I ran:
+   ```sh
+   gcloud compute instances describe wireguard \
+       --project jetstack-mael-valais \
+       --zone=europe-southwest1-c --format json \
+         | jq -r '.networkInterfaces[].accessConfigs[] | select(.type=="ONE_TO_ONE_NAT") | .natIP'
+   ```
+
+2. Go to <https://google.domains> (I use their DNS for mael.pw) and add the
+   record:
+
+   ```text
+   print-your-cert.mael.pw.     300     IN      A      34.175.254.25
+   ```
+
+Then, I installed Tailscale and made sure IP forwarding is enabled on the VM:
 
 ```sh
-gcloud compute instances describe wireguard \
-    --project jetstack-mael-valais \
-    --zone=europe-southwest1-c --format json \
-      | jq -r '.networkInterfaces[].accessConfigs[] | select(.type=="ONE_TO_ONE_NAT") | .natIP'
-```
-
-Now, let us configure stuff on the VM:
-
-```shell=sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- 'sudo apt install wireguard -y'
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- 'curl -fsSL https://tailscale.com/install.sh | sh'
 gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- \
     "sudo perl -ni -e 'print if \!/^net.ipv4.ip_forward=1/d' /etc/sysctl.conf; \
-     sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1"
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- sudo reboot
+     sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1; \
+     sudo sysctl -w net.ipv4.ip_forward=1"
 ```
 
-```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- bash <<EOF
-(umask 077 && wg genkey > wg-private.key)
-wg pubkey < wg-private.key > wg-public.key
-EOF
-```
-
-```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- bash <<'EOF'
-sudo tee /etc/wireguard/wg0.conf <<WG0
-[Interface]
-PrivateKey = $(cat wg-private.key)
-MTU = 1380
-Address = 10.0.2.1/24
-PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o $(ip -o -4 route show to default | awk '{print $5}') -j MASQUERADE
-PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o $(ip -o -4 route show to default | awk '{print $5}') -j MASQUERADE
-ListenPort = 51820
-SaveConfig = True
-AllowedIPs = ::/0, 0.0.0.0/0
-WG0
-EOF
-sudo wg-quick up wg0
-```
-
-## Tailscale + Caddy
+Finally, I installed Caddy as a systemd unit by following [their
+guide](https://caddyserver.com/docs/install#debian-ubuntu-raspbian):
 
 ```sh
 gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- bash <<'EOF'
