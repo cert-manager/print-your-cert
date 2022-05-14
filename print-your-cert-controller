@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 set -uo pipefail
+# I won't set -x because this is a long-lasting script and I can't afford
+# crashes.
 
 # For testing purposes, that allows me to run ./print-your-cert-controller
 # without having to put pem-to-png in my PATH.
@@ -49,8 +51,8 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
 
         printf "%s: printing.\n" "$(jq -r .metadata.name <<<"$cert")"
 
-        if ! pem-to-png <<<"$pem"; then
-            printf "%s: failed to generate front.png and back.png.\n" "$(jq -r .metadata.name <<<"$cert")"
+        if ! out=$(pem-to-png <<<"$pem" 2>&1); then
+            printf "%s: failed to generate front.png and back.png.\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
             continue
         fi
 
@@ -85,4 +87,4 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
     esac
 done
 
-exit 98
+exit 123
