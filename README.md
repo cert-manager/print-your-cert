@@ -12,7 +12,7 @@ prompting for a name and email:
 
 <img alt="landing-1" src="https://user-images.githubusercontent.com/2195781/168419133-0b1f814a-a18d-426b-8766-f1908e965707.png" width="500"/>
 
-After clicking "Get my certificate", the participant isss prompted to reload the
+After clicking "Get my certificate", the participant is prompted to reload the
 page.
 
 <img alt="landing-3" src="https://user-images.githubusercontent.com/2195781/168419130-a177aecf-5a5f-4ac4-8178-2e34c16309d7.png" width="500"/>
@@ -40,10 +40,12 @@ When going back to their certificate, the participant notices that the button "p
 <img alt="landing-5" src="https://user-images.githubusercontent.com/2195781/168419125-9fa12189-6a17-4578-9a3d-a6f510867881.png" width="500"/>
 
 The front-side label looks like this:
-<img src="https://user-images.githubusercontent.com/2195781/168418627-0952377f-5a1d-4dbe-a41f-80cf99430b77.png" width="400" alt="front"/>
+
+<img src="https://user-images.githubusercontent.com/2195781/168418627-0952377f-5a1d-4dbe-a41f-80cf99430b77.png" width="300" alt="front"/>
 
 The back-side label looks like this:
-<img src="https://user-images.githubusercontent.com/2195781/168418632-8650a78a-d540-4831-9238-dd59b9994a2b.png" width="300" alt="back"/>
+
+<img src="https://user-images.githubusercontent.com/2195781/168418632-8650a78a-d540-4831-9238-dd59b9994a2b.png" width="200" alt="back"/>
 
 The back-side labels is a QR code containing the PEM-encoded certificate that
 was issued. Since we didn't find any good use for TLS, we didn't include the
@@ -79,6 +81,37 @@ And that's it: you have a certificate that proves that you were at the KubeCon
 cert-manager booth! The CA used during the conference will be available at some
 point so that people can verify the signature.
 
+## What's the stack?
+
+```text
+https://print-your-cert.mael.pw
+                |
+                |
+                v
+            VM on GCP
+                |
+                |  Caddy + Tailscale
+                |  (see section below)
+                |
+                v
++---------------------------------+
+|               Pi                |
+|  K3s cluster                    |   USB   +-------------------+
+|    cert-manager                 | ------> | Brother QL-820NWB |
+|    print-your-cert-ui (:8080)   |         +-------------------+
+|    print-your-cert-controller   |                (on the booth)
++---------------------------------+
+                |    (on the booth)
+          HDMI  |
+                v
+     +-------------------+
+     | list of certs     |
+     | already printed   | 42" display.
+     |                   |
+     +-------------------+
+            (on the booth)
+```
+
 ## Staff: test things
 
 For anyone who is in the cert-manager org and wants to test or debug
@@ -97,7 +130,8 @@ things:
   ssh pi@100.121.173.5
   ```
 
-  > The public keys have been added to the `authorized_keys` of the Pi.
+  > The public keys of each cert-manager org member have been added to the
+  > `authorized_keys` of the Pi.
 
 ## Running
 
