@@ -47,6 +47,21 @@ The back-side label looks like this:
 
 <img src="https://user-images.githubusercontent.com/2195781/168418632-8650a78a-d540-4831-9238-dd59b9994a2b.png" width="200" alt="back"/>
 
+The person can choose the color of the card onto which the cert-manager booth
+staff will put the two labels that were automatically printed on. I purchased
+200 cards of each color (1400 total), so it should be enough:
+
+<img alt="a7-sized-card-1" src="https://user-images.githubusercontent.com/2195781/168466048-39aa8109-01cf-44f6-ac6a-3f90ec9e355c.jpg" width="300"/><img alt="a7-sized-card-2" src="https://user-images.githubusercontent.com/2195781/168466050-d9f20184-8c96-4120-80cc-5b8b0fbd6936.jpg" width="300"/>
+
+Here is what it may look like for real. Since I didn't have the above cards for
+the prototype, I have cut a piece of cardboard with the A7 size (7.4 x 10.5 cm).
+The label on the front is 6.2 x 8.7 cm, and the wax stamp is 4 cm large.
+
+<img alt="card-draft-front" src="https://user-images.githubusercontent.com/2195781/168466186-4559cf12-ee44-42a1-bb24-0e991e09b287.jpeg" width="300"/><img alt="card-draft-back" src="https://user-images.githubusercontent.com/2195781/168466187-5ffb4c96-cd70-4612-ac43-f4169b3ee427.jpeg" width="300">
+
+The "real" colored cards will be smaller (5.4 x 9.0 cm) meaning that I will have
+to do a smaller label on both sides.
+
 The back-side labels is a QR code containing the PEM-encoded certificate that
 was issued. Since we didn't find any good use for TLS, we didn't include the
 private key.
