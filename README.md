@@ -282,7 +282,7 @@ EOF
 Finally, you can run the UI:
 
 ```sh
-go run . --issuer=print-your-cert-ca --issuer-type=ClusterIssuer
+go run . --issuer=print-your-cert-ca --issuer-kind=ClusterIssuer
 ```
 
 ### Build `ghcr.io/maelvls/print-your-cert-controller:latest`
