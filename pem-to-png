@@ -33,7 +33,7 @@ EOF
 convert -size 984x696 canvas:white \
     \( -gravity NorthEast kubecon-eu-2022-logo.svg -resize 400x400 -background white -alpha remove -alpha off -monochrome \) -geometry +0+0 -composite \
     \( -gravity NorthEast logo.svg -resize 370x370 -background white -alpha remove -alpha off -monochrome \) -geometry +20+190 -composite \
-    \( -gravity NorthWest -font Open-Sans -pointsize 30 -fill black -annotate +0-40 "@/tmp/pem-to-png.txt" \) -geometry +0+0 \
+    \( -gravity NorthWest -font Open-Sans-Regular -pointsize 30 -fill black -annotate +0-40 "@/tmp/pem-to-png.txt" \) -geometry +0+0 \
     \( -gravity SouthWest -font DejaVu-Sans-Mono -pointsize 26 -fill black -annotate +0+0 "$(step certificate inspect --short /tmp/crt | sed -e 's/\[\(.*\)\]/\n\1/' -e 's/Certificate (\(.*\))/Certificate\nAlgorithm: \1/' | sed 's/^  //')" \) -geometry +0+0 \
     -background None -layers Flatten front.png
 

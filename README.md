@@ -210,7 +210,7 @@ spec:
 EOF
 ```
 
-### Build `ghcr.io/maelvls/print-your-cert-ui:latest`
+### Build the UI (`ghcr.io/maelvls/print-your-cert-ui:latest`)
 
 ```sh
 # Multi-arch pushed to registry:
@@ -307,6 +307,44 @@ Run the "debug" printer UI (brother_ql_web):
 
 ```sh
 docker run -d --restart=always --name brother_ql_web --privileged -v /dev/bus/usb:/dev/bus/usb -p 0.0.0.0:8013:8013 ghcr.io/maelvls/print-your-cert-controller:latest brother_ql_web
+```
+
+### Local development on the controller (that creates PNGs and prints them)
+
+The controller is made in two pieces: `pem-to-png` that turns one PEM into two
+PNGs, and `print-your-cert-controller` that runs `pem-to-png` every time a
+certificate object in Kubernetes becomes ready.
+
+#### `pem-to-png`
+
+pem-to-png is what turns a PEM file into two PNGs: `front.png` and `back.png`.
+
+```sh
+brew install imagemagick qrencode step svn
+brew install homebrew/cask-fonts/font-open-sans
+brew install homebrew/cask-fonts/font-dejavu
+```
+
+To run it, for example:
+
+```sh
+./pem-to-png <<EOF
+-----BEGIN CERTIFICATE-----
+MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUw
+IwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEz
+MDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFy
+IDxmb28uYmFyQGJhci5mb28+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
+AQEAtmGM5lil9Vw/y5LhpgO8t5gSb5oUo+Dp5vWw0Z5C7rjvifi0/eD9MbVFkxb+
++hmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF6
+7KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74+Nl6tyjlMOsTHv+LY0jPfm
+AtO6eR+Ef/HvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94Ycpg
+sJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh/QRv8ksX+OupHTNdH06
+WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYD
+VR0TAQH/BAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggq
+hkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIg
+aPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc=
+-----END CERTIFICATE-----
+EOF
 ```
 
 ## Troubleshooting
