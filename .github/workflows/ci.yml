@@ -15,7 +15,7 @@ jobs:
 
       - run: |
           mkdir public
-          cp index.html js/* public/
+          cp -r index.html js/ public/
 
       # The GITHUB_TOKEN already given for running github actions is not
       # sufficient. It allows me to push to master but for some reason it won't
