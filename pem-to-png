@@ -7,34 +7,88 @@ set -euo pipefail
 echo "Reading PEM from stdin..." >&2
 cat >/tmp/crt
 
-cat <<EOF >/tmp/pem-to-png.txt
-
-Thank you for visiting the cert-manager
-booth! We hope you are enjoying
-your time in Valencia.
-
-This card is a proof that you
-were there! on the back of
-the card, the QR code
-contains your certificate.
-EOF
-
 # When printing to the Brother QL-820WNB, the width of the image (as opposed to
 # the height) is scaled to the 6.2 cm of the label tape's width. In the
 # following, e.g., 984 x 696 px, means height x width. So the "second" number is
 # the one scaled to 6.2 cm.
 #
-#  Format 0: 696 px x 696 px (6.2 x 6.2 cm)
-#  Format 1: 984 x 696  px (8.7 x 6.2 cm, requires --rotate 90 because the image
-#            comes at 696 x 984 px)
-#  Format 2: 696 x 696 px 6.2 cm 492 px = 4.4 cm ()
+# For example, with a portrait-mode image of 696 x 232 px, the "top" if the
+# image is scaled to the width of the paper roll (6.2 cm). If the "top" is 696
+# px, which the the nominal pixel width, then no scaling is neededd.
+#
+#                            696   x   232 px
+#                            ^^^       ^^^
+#                           width     height
+#                          (6.2 cm)
+#
+#   -  -  -  -  -  -  -  -  -  -  +--------------+  ^
+#                                 |    RIGHT     |  |
+#                                 |              |  |
+#    PAPER UNROLLS THIS WAY       | TOP          |  |  width
+#    -------------------->        |              |  |  696 px
+#                                 |   (normal    |  | (6.2 cm)
+#                                 |    orienta.) |  |
+#   -  -  -  -  -  -  -  -  -  -  +--------------+  v
+#                                 <-------------->
+#                               height 232 px (2.9 cm)
+#
+#
+# If I want the "right" of the image to scale to the 6.2 cm of the paper roll,
+# I need to --rotate 90. Since the "right" of the image is now scaled to the
+# width of the paper roll, I need to have an image with a in which case the size
+# is 696 x 984 px:
+#
+#                            696   x   984 px        (rotated 90 degrees)
+#                            ^^^       ^^^
+#                           width     height
+#                          (6.2 cm)
+#
+#   -  -  -  -  -  -  -  -  -  -  +------------------------------+  ^
+#                                 |             TOP              |  |
+#                                 |                              |  |
+#    PAPER UNROLLS THIS WAY       |                              |  |  width
+#    -------------------->        |                        RIGHT |  |  696 px
+#                                 |                              |  | (6.2 cm)
+#                                 |            (rotated 90)      |  |
+#   -  -  -  -  -  -  -  -  -  -  +------------------------------+  v
+#                                 <------------------------------>
+#                                       height 984 px (8.4 cm)
+#
+#
+# Format 1: 984 x 696 px (8.7 x 6.2 cm), requires --rotate 90 so that "696 px"
+# (the height) coincides with the the width of the paper roll.
+#
+# Format 2: 696 x 492 px (6.2 x 4.4 cm), requires no rotation.
 
-# brother_ql must be used with "--rotate 90".
-convert -size 984x696 canvas:white \
-    \( -gravity NorthEast kubecon-eu-2022-logo.svg -resize 400x400 -background white -alpha remove -alpha off -monochrome \) -geometry +0+0 -composite \
-    \( -gravity NorthEast logo.svg -resize 370x370 -background white -alpha remove -alpha off -monochrome \) -geometry +20+190 -composite \
-    \( -gravity NorthWest -font Open-Sans-Regular -pointsize 30 -fill black -annotate +0-40 "@/tmp/pem-to-png.txt" \) -geometry +0+0 \
-    \( -gravity SouthWest -font DejaVu-Sans-Mono -pointsize 26 -fill black -annotate +0+0 "$(step certificate inspect --short /tmp/crt | sed -e 's/\[\(.*\)\]/\n\1/' -e 's/Certificate (\(.*\))/Certificate\nAlgorithm: \1/' | sed 's/^  //')" \) -geometry +0+0 \
+line1=$(
+    cat <<EOF
+Thank you for visiting the cert-manager
+booth! We hope you are enjoying
+your time in Valencia.
+EOF
+)
+
+line2=$(
+    cat <<EOF
+This card is a proof that you
+were there! on the back of
+the card, the QR code
+contains your certificate.
+EOF
+)
+
+convert -size 696x492 canvas:white \
+    \( -gravity NorthEast logo.png -resize 160 -background white -alpha remove -alpha off -monochrome \) -geometry +40+20 -composite \
+    \( -gravity East kubecon-eu-2022-logo.png -resize 300 -background white -alpha remove -alpha off -monochrome \) -geometry +20+40 -composite \
+    \( -gravity NorthWest -font Open-Sans-Regular -pointsize 22 -fill black -annotate +0-0 "$line1" \) -geometry +0+0 \
+    \( -gravity NorthWest -font Open-Sans-Regular -pointsize 22 -fill black -annotate +0+115 "$line2" \) -geometry +0+0 \
+    \( -gravity SouthWest -font DejaVu-Sans-Mono -pointsize 22 -fill black -annotate +0+0 "$(step certificate inspect --short /tmp/crt | sed -e 's/\[\(.*\)\]/\n\1/' -e 's/Certificate (\(.*\))/Certificate\nAlgorithm: \1/' | sed 's/^  //')" \) -geometry +0+0 \
     -background None -layers Flatten front.png
 
-qrencode --type PNG --margin 0 -o - </tmp/crt | convert - -monochrome -filter point -interpolate nearest -resize 696x696 back.png
+# See js/x509.js to understand the format expected by the asn1 query parameter.
+url=$(grep -v 'CERTIFICATE' /tmp/crt | tr -d '$\n' | python3 -c "import urllib.parse; print(urllib.parse.quote_plus(open(0).read()))")
+echo "https://maelvls.dev/print-your-cert?asn1=$url" | qrencode --type PNG --margin 0 -o - | convert -size 696x492 canvas:white \
+    \( -gravity Center -monochrome -filter point -interpolate nearest - -resize 492 \) -composite back.png
+
+# Example:
+# https://maelvls.dev/print-your-cert?asn1=MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUwIwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEzMDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFyIDxmb28uYmFyQGJhci5mb28%2BMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtmGM5lil9Vw%2Fy5LhpgO8t5gSb5oUo%2BDp5vWw0Z5C7rjvifi0%2FeD9MbVFkxb%2B%2BhmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF67KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74%2BNl6tyjlMOsTHv%2BLY0jPfmAtO6eR%2BEf%2FHvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94YcpgsJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh%2FQRv8ksX%2BOupHTNdH06WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH%2FBAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggqhkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIgaPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc%3D
