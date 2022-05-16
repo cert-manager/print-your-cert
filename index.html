@@ -45,11 +45,15 @@
       const cert = getAsn1();
       document.getElementById("placeholder-pem").innerHTML = cert;
       document.getElementById("placeholder-subject").innerHTML = cert.subject;
-      document.getElementById("placeholder-issuer");
-      document.getElementById("placeholder-serial");
-      document.getElementById("placeholder-algorithm");
-      document.getElementById("placeholder-not-before");
-      document.getElementById("placeholder-not-after");
+      document.getElementById("placeholder-issuer").innerHTML = cert.issuer;
+      document.getElementById("placeholder-serial").innerHTML =
+        cert.serialNumber;
+      document.getElementById("placeholder-algorithm").innerHTML =
+        cert.signatureAlgorithm.name;
+      document.getElementById("placeholder-not-before").innerHTML =
+        cert.notBefore;
+      document.getElementById("placeholder-not-after").innerHTML =
+        cert.notAfter;
     </script>
   </body>
 </html>
