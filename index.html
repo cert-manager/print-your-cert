@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style></style>
+    <script src="https://unpkg.com/@peculiar/x509"></script>
+    <script src="js/x509.js"></script>
+  </head>
+
+  <body>
+    <h1>Display your certificate</h1>
+
+    <pre id="placeholder-pem"></pre>
+
+    <table>
+      <tr>
+        <td>Subject</td>
+        <td id="placeholder-subject"></td>
+      </tr>
+      <tr>
+        <td>Issuer</td>
+        <td id="placeholder-issuer"></td>
+      </tr>
+      <tr>
+        <td>Serial</td>
+        <td id="placeholder-serial"></td>
+      </tr>
+      <tr>
+        <td>Public key algorithm</td>
+        <td id="placeholder-algorithm"></td>
+      </tr>
+      <tr>
+        <td>Not before</td>
+        <td id="placeholder-not-before"></td>
+      </tr>
+      <tr>
+        <td>Not after</td>
+        <td id="placeholder-not-after"></td>
+      </tr>
+    </table>
+
+    <p>This URL will be kept alive as long as GitHub Pages is alive.</p>
+
+    <script>
+      const cert = getAsn1();
+      document.getElementById("placeholder-pem").innerHTML = cert;
+      document.getElementById("placeholder-subject").innerHTML = cert.subject;
+      document.getElementById("placeholder-issuer");
+      document.getElementById("placeholder-serial");
+      document.getElementById("placeholder-algorithm");
+      document.getElementById("placeholder-not-before");
+      document.getElementById("placeholder-not-after");
+    </script>
+  </body>
+</html>
