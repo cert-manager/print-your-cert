@@ -18,11 +18,12 @@ jobs:
           cp index.html js/* public/
 
       # The GITHUB_TOKEN already given for running github actions is not
-      # sufficient. It allows me to push to master but for some reason it
-      # won't trigger a github-pages "build & push to CDN". I had to create a
-      # personnal access token with the 'repo' scope.
+      # sufficient. It allows me to push to master but for some reason it won't
+      # trigger a github-pages "build & push to CDN". I had to create a personal
+      # access token with the 'repo' scope. Also, it is not possible anymore to
+      # call that secret "GITHUB_PAT".
       - uses: peaceiris/actions-gh-pages@v3
         with:
-          personal_token: ${{ secrets.GITHUB_PAT }}
+          personal_token: ${{ secrets.GH_PAT }}
           publish_dir: ./public
           publish_branch: gh-pages
