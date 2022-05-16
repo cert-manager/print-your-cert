@@ -178,18 +178,18 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 				},
 			}, metav1.CreateOptions{})
 			if err != nil {
-				tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "There was an error creating your certificate."})
+				tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Error: "There was an error creating your certificate. The page will be reloaded every 5 seconds until this issue is resolved."})
 				log.Printf("GET /: issue while creating the Certificate named %s in namespace %s for '%s <%s>' in Kubernetes: %v", certName, *namespace, personName, email, err)
 				return
 			}
 
 			w.WriteHeader(201)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Message: "A certificate was successfully requested. Reload to see the progress."})
+			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Message: "A certificate was successfully requested. The page will be reloaded every 5 seconds until the certificate is issued."})
 			log.Printf("GET /: successfully created a certificate named %s in namespace %s for '%s <%s>' in Kubernetes", certName, *namespace, personName, email)
 			return
 		case err != nil:
 			w.WriteHeader(500)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "Failed getting the Certificate in Kubernetes."})
+			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Error: "Failed getting the Certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved."})
 			log.Printf("GET /: while getting the Certificate %s in namespace %s in Kubernetes: %v", certName, *namespace, err)
 			return
 		}
@@ -207,7 +207,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		// if it is ready.
 		if !isReady(cert) {
 			w.WriteHeader(423)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Message: "Your certificate is not ready yet. Reload to see the progress.", Debug: debugMsg})
+			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Message: "Your certificate is not ready yet. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
 			log.Printf("GET /: the requested certificate %s in namespace %s is not ready yet.", certName, *namespace)
 			return
 		}
@@ -216,7 +216,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
 		if err != nil {
 			w.WriteHeader(423)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "A certificate already exists, but the Secret does not exist. Try again.", Debug: debugMsg})
+			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Error: "A certificate already exists, but the Secret does not exist; the page will be reloaded in 5 seconds until this issue is resolved.", Debug: debugMsg})
 			log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, *namespace, cert.Spec.SecretName)
 			return
 		}
@@ -226,7 +226,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		certPem, ok := secret.Data["tls.crt"]
 		if !ok {
 			w.WriteHeader(423)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "Internal issue with the stored certificate in Kubernetes. Try again.", Debug: debugMsg})
+			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Error: "Internal issue with the stored certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
 			log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
 			return
 		}
@@ -326,7 +326,7 @@ func printPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) fun
 		_, err = cmclient.CertmanagerV1().Certificates(*namespace).Update(r.Context(), cert, metav1.UpdateOptions{})
 		if err != nil {
 			w.WriteHeader(500)
-			tmpl.ExecuteTemplate(w, "print.html", tmplDataLandingPOST{Name: personName, Email: email, Error: "Could not trigger the print of the certificate."})
+			tmpl.ExecuteTemplate(w, "print.html", tmplDataLandingPOST{Name: personName, Email: email, Error: "Could not trigger the print of the certificate. Please go to the previous page and press the button again."})
 			log.Printf("POST /: could not trigger the print of the certificate %s in namespace %s: %v", certName, *namespace, err)
 			return
 		}
@@ -479,7 +479,8 @@ type tmplDataLandingGET struct {
 	CanPrint          bool                         // Optional.
 	AlreadyPrinted    bool                         // Optional.
 	MarkedToBePrinted bool                         // Optional.
-	Debug             string
+	Debug             string                       // Optional.
+	Refresh           int                          // Optional. In seconds.
 }
 
 type tmplDataLandingPOST struct {

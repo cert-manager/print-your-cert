@@ -2,8 +2,11 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <style></style>
+    {{if .Refresh}}
+    <meta http-equiv="refresh" content="{{.Refresh}}" />
+    {{end}}
   </head>
+
   <body>
     <h1>Create your certificate</h1>
     <div>
