@@ -168,6 +168,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 				},
 				Spec: certmanagerv1.CertificateSpec{
 					CommonName: commonName,
+					Duration:   &metav1.Duration{Duration: 3 * 3650 * 24 * time.Hour}, // 30 years.
 					SecretName: certName,
 					IssuerRef: cmmetav1.ObjectReference{
 						Name:  *issuer,

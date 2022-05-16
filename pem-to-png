@@ -19,6 +19,16 @@ the card, the QR code
 contains your certificate.
 EOF
 
+# When printing to the Brother QL-820WNB, the width of the image (as opposed to
+# the height) is scaled to the 6.2 cm of the label tape's width. In the
+# following, e.g., 984 x 696 px, means height x width. So the "second" number is
+# the one scaled to 6.2 cm.
+#
+#  Format 0: 696 px x 696 px (6.2 x 6.2 cm)
+#  Format 1: 984 x 696  px (8.7 x 6.2 cm, requires --rotate 90 because the image
+#            comes at 696 x 984 px)
+#  Format 2: 696 x 696 px 6.2 cm 492 px = 4.4 cm ()
+
 # brother_ql must be used with "--rotate 90".
 convert -size 984x696 canvas:white \
     \( -gravity NorthEast kubecon-eu-2022-logo.svg -resize 400x400 -background white -alpha remove -alpha off -monochrome \) -geometry +0+0 -composite \

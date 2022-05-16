@@ -66,6 +66,16 @@ The back-side labels is a QR code containing the PEM-encoded certificate that
 was issued. Since we didn't find any good use for TLS, we didn't include the
 private key.
 
+I wanted the smallest TLS certificate possible. After reading [Smallest possible
+certificate for IoT
+device](https://crypto.stackexchange.com/questions/83719/smallest-possible-certificate-for-iot-device),
+it seems ECDSA is good for small signatures, and RSA is not good. The
+configuration for the ECDSA signature is shown below in
+[print-your-cert-ca](#print-your-cert-ca). Also, I chose to have a very long
+expiry for both certificates since there is no security risk associated with
+leaking either of the private keys (since the private keys of both will be
+discarded on 21 May 2022 anyways).
+
 The experience is terrible with this raw PEM certificate. A better experience
 would be to store in the QR code a URL that has the PEM-encoded certificate as a
 query parameter. This would be a long-lasting URL (people may want to open it in
@@ -160,6 +170,8 @@ k3d-k3s-default-server-0   Ready    control-plane,master   11m   v1.22.7+k3s1
 
 Make sure cert-manager is running:
 
+<a id="print-your-cert-ca"></a>
+
 ```sh
 kubectl apply -f- <<EOF
 apiVersion: cert-manager.io/v1
@@ -173,15 +185,16 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: ca
+  name: print-your-cert-ca
   namespace: cert-manager
 spec:
   isCA: true
   privateKey:
     algorithm: ECDSA
     size: 256
-  secretName: ca
-  commonName: The maintainers <cert-manager-maintainers@googlegroups.com>
+  secretName: print-your-cert-ca
+  commonName: The cert-manager maintainers
+  duration: 262800h # 30 years.
   issuerRef:
     name: self-signed
     kind: Issuer
@@ -189,11 +202,11 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  name: ca-issuer
+  name: print-your-cert-ca
   namespace: cert-manager
 spec:
   ca:
-    secretName: ca
+    secretName: print-your-cert-ca
 EOF
 ```
 
