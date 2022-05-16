@@ -229,17 +229,71 @@ To run the UI:
 docker run -d --restart=always --name print-your-cert-ui --net=host -v $HOME/.kube/config:/root/.kube/config ghcr.io/maelvls/print-your-cert-ui:latest --issuer ca-issuer --issuer-kind ClusterIssuer --listen 0.0.0.0:8080
 ```
 
+### Local development on the UI
+
+You will need the following tools installed:
+- [Go](https://go.dev/doc/install) (1.17 or above),
+- [K3d](https://k3d.io/stable/#install-current-latest-release),
+- [Helm](https://helm.sh/docs/intro/install/).
+
+The first step is to create a cluster with a cert-manager issuer:
+
+```sh
+k3d cluster create
+helm repo add jetstack https://charts.jetstack.io
+helm upgrade --install cert-manager jetstack/cert-manager --version v1.8.0 --namespace cert-manager --set installCRDs=true --create-namespace
+kubectl apply -f- <<EOF
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: self-signed
+  namespace: cert-manager
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: print-your-cert-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  secretName: print-your-cert-ca
+  commonName: The cert-manager maintainers
+  duration: 262800h # 30 years.
+  issuerRef:
+    name: self-signed
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: print-your-cert-ca
+  namespace: cert-manager
+spec:
+  ca:
+    secretName: print-your-cert-ca
+EOF
+```
+
+Finally, you can run the UI:
+
+```sh
+go run . --issuer=print-your-cert-ca --issuer-type=ClusterIssuer
+```
+
 ### Build `ghcr.io/maelvls/print-your-cert-controller:latest`
 
 Multi-arch:
 
 ```sh
+# Multi-arch push:
 docker buildx build -f Dockerfile.controller --platform amd64,linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-controller:latest --push .
-```
 
-Build directly to the Pi:
-
-```sh
+# Or build and push directly to the Pi:
 docker buildx build -f Dockerfile.controller --platform linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-controller:latest -o type=docker,dest=print-your-cert-controller.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert-controller.tar
 ```
 
