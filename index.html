@@ -2,44 +2,61 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <style></style>
     <script src="https://unpkg.com/@peculiar/x509"></script>
     <script src="js/x509.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
   </head>
 
   <body>
-    <h1>Display your certificate</h1>
+    <div class="wrapper">
+      <img src="images/logo.svg" alt="Logo" />
+      <h1 class="mainTitle">Print Your Certificate</h1>
+      <div class="divider"></div>
+      <div>
+        <h2 class="secondaryTitle">Display your Certificate</h2>
 
-    <pre id="placeholder-pem"></pre>
-
-    <table>
-      <tr>
-        <td>Subject</td>
-        <td id="placeholder-subject"></td>
-      </tr>
-      <tr>
-        <td>Issuer</td>
-        <td id="placeholder-issuer"></td>
-      </tr>
-      <tr>
-        <td>Serial</td>
-        <td id="placeholder-serial"></td>
-      </tr>
-      <tr>
-        <td>Public key algorithm</td>
-        <td id="placeholder-algorithm"></td>
-      </tr>
-      <tr>
-        <td>Not before</td>
-        <td id="placeholder-not-before"></td>
-      </tr>
-      <tr>
-        <td>Not after</td>
-        <td id="placeholder-not-after"></td>
-      </tr>
-    </table>
-
-    <p>This URL will be kept alive as long as GitHub Pages is alive.</p>
+        <div class="panel">
+          <div class="content">
+            <label>Subject</label>
+            <div id="placeholder-subject">dsvdbsdbbsdbbsdbbssdbsdb</div>
+            <label>Issuer</label>
+            <div id="placeholder-issuer">dsvdbsdbbsdbbsdbbssdbsdb</div>
+            <label>Serial</label>
+            <div id="placeholder-serial">dsvdbsdbbsdbbsdbbssdbsdb</div>
+            <label>Public key algorithm</label>
+            <div id="placeholder-algorithm">dsvdbsdbbsdbbsdbbssdbsdb</div>
+            <label>Not before</label>
+            <div id="placeholder-not-before">dsvdbsdbbsdbbsdbbssdbsdb</div>
+            <label>Not after</label>
+            <div id="pplaceholder-not-after">dsvdbsdbbsdbbsdbbssdbsdb</div>
+          </div>
+        </div>
+      </div>
+      <p>This URL will be kept alive as long as GitHub Pages is alive.</p>
+      <div class="push"></div>
+    </div>
+    <footer>
+      <p>
+        Powered by
+        <a href="https://cert-manager.io" target="_blank">cert-manager.io</a>
+      </p>
+      <p class="small">
+        Project proudly supported by
+        <a href="https://jetstack.io" target="_blank">jetstack.io</a>
+      </p>
+      <p class="small">
+        Design by
+        <a href="https://constantinchirila.com" target="_blank"
+          >Constantin Chirila</a
+        >
+      </p>
+    </footer>
 
     <script>
       const cert = getAsn1();

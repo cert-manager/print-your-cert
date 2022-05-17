@@ -161,6 +161,16 @@ button:hover {
   font-size: 16px;
   line-height: 27px;
 }
+
+.panel label {
+  font-weight: 700;
+}
+.panel label + div {
+  margin-bottom: 20px;
+}
+.panel label + div:last-child {
+  margin-bottom: 0;
+}
 .panel.large {
   max-width: 710px;
 }
