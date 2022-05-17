@@ -19,13 +19,17 @@
       <br />
       <img src="static/images/logo.svg" alt="Logo" />
       <h1 class="mainTitle">Print Your Certificate</h1>
-      <p>{{.CountPrinted}} certificates have already been printed.</p>
+      <p>
+        {{.CountPrinted}} certificates have already been printed, and
+        {{.CountPending}} and waiting to be printed. See
+        <a href="/list">the list</a>.
+      </p>
       <div class="divider"></div>
 
       <form method="GET" action="/" class="form">
         <p>
           Fill in your details and create your very own certificate which it
-          will printed for your.
+          will printed to take home.
         </p>
         <input
           name="name"
@@ -44,6 +48,11 @@
           />
           {{if .Error}}
           <div class="error">{{.Error}}</div>
+          {{end}} {{if .DuplicateURL}}
+          <div class="error">
+            This email has already been used for creating a certificate:
+            <a href="{{.DuplicateURL}}">click here to see it</a>.
+          </div>
           {{end}}
         </div>
         <button type="submit">Get your certificate</button>
@@ -71,3 +80,7 @@
     {{end}}
   </body>
 </html>
+
+{{define "urltocertificate"}}
+<a href="/certificate?certName={{.}}">{{.}}</a>
+{{end}}

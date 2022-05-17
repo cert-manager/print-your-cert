@@ -123,11 +123,13 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 			log.Printf("GET /: while listing the certificates that have Printed=True: %v", err)
 			return
 		}
-
-		var printed int
+		var printed, pending int
 		for _, c := range result.Items {
 			if isAlreadyPrinted(&c) {
 				printed++
+			}
+			if isPendingPrint(&c) {
+				pending++
 			}
 		}
 
@@ -143,21 +145,21 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		// provided yet.
 		if personName == "" && email == "" {
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Message: "Welcome! To get your certificate, fill in your name and email."})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, CountPending: pending, Message: "Welcome! To get your certificate, fill in your name and email."})
 			return
 		}
 
 		// Let's check that both the email and name have been entered.
 		if personName == "" && email != "" || personName != "" && email == "" {
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Message: "Please fill in both the email and name."})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, CountPending: pending, Message: "Please fill in both the email and name."})
 			log.Printf("GET /: the user has given an empty name %q or an empty email %q", personName, email)
 			return
 		}
 
 		if !valid(email) {
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Error: "The email is invalid."})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, CountPending: pending, Error: "The email is invalid."})
 			log.Printf("GET /: the user %q has given an invalid email %q", personName, email)
 			return
 		}
@@ -170,7 +172,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		if len(commonName) > 64 {
 			msg := fmt.Sprintf("Oops, the common name formed using your name and email (%s) counts as %d bytes which goes beyond the common name limit of 64 bytes. Could you try abbreviating some part of your name and try again?", commonName, len(commonName))
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Error: msg})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, CountPending: pending, Error: msg})
 			log.Printf("GET /: the user %q has given a common name %q that is above the 64 bytes limit", personName, commonName)
 			return
 		}
@@ -200,12 +202,12 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		switch {
 		case k8serrors.IsAlreadyExists(err):
 			w.WriteHeader(409)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Error: "This email has already been used for creating a certificate."})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, CountPending: pending, DuplicateURL: fmt.Sprintf("/certificate?certName=%s", certName)})
 			log.Printf("GET /: cannot create due to duplicate certificate name %s", certName)
 			return
 		case err != nil:
 			w.WriteHeader(500)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Refresh: 5, Error: "There was an error creating your certificate. The page will be reloaded every 5 seconds until this issue is resolved."})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, CountPending: pending, Refresh: 5, Error: "There was an error creating your certificate. The page will be reloaded every 5 seconds until this issue is resolved."})
 			log.Printf("GET /: issue while creating the Certificate named %s in namespace %s for '%s <%s>' in Kubernetes: %v", certName, *namespace, personName, email, err)
 			return
 		}
@@ -457,16 +459,20 @@ func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interfac
 		}
 
 		alreadyPrinted := isAlreadyPrinted(cert)
-		stillToBePrinted := markedToBePrinted(cert) && !alreadyPrinted
+		pendingPrint := isPendingPrint(cert)
 
-		canPressPrintButton := !stillToBePrinted && !alreadyPrinted
+		canPressPrintButton := !pendingPrint && !alreadyPrinted
 
 		// Let's show the user the Certificate.
 		certificateHTMLData := certificateToHTML(x509Cert)
 
 		log.Printf("GET /certificate: 200: certificate %s in namespace %s was found", certName, *namespace)
-		_ = tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Certificate: &certificateHTMLData, CanPrint: canPressPrintButton, MarkedToBePrinted: stillToBePrinted, AlreadyPrinted: alreadyPrinted, Debug: debugMsg})
+		_ = tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Certificate: &certificateHTMLData, CanPrint: canPressPrintButton, MarkedToBePrinted: pendingPrint, AlreadyPrinted: alreadyPrinted, Debug: debugMsg})
 	}
+}
+
+func isPendingPrint(cert *certmanagerv1.Certificate) bool {
+	return markedToBePrinted(cert) && !isAlreadyPrinted(cert)
 }
 
 // When the user goes to /list, they see a list of the previously submitted
@@ -508,7 +514,19 @@ func listPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 				State:      stateOfCert(cert),
 			})
 		}
-		tmpl.ExecuteTemplate(w, "list.html", listPageData{Certificates: certsOut, Refresh: refresh})
+
+		// We also want to display the count of printed certificates.
+		var printed, pending int
+		for _, c := range certs.Items {
+			if isAlreadyPrinted(&c) {
+				printed++
+			}
+			if isPendingPrint(&c) {
+				pending++
+			}
+		}
+
+		tmpl.ExecuteTemplate(w, "list.html", listPageData{Certificates: certsOut, Refresh: refresh, CountPrinted: printed, CountPending: pending})
 	}
 }
 
@@ -555,7 +573,9 @@ type landingPageData struct {
 	MarkedToBePrinted bool                     // Optional.
 	Debug             string                   // Optional.
 	Refresh           int                      // Optional. In seconds.
-	CountPrinted      int
+	CountPrinted      int                      // Mandatory.
+	CountPending      int                      // Mandatory.
+	DuplicateURL      string
 }
 
 type printPageData struct {
@@ -578,6 +598,8 @@ type listPageData struct {
 	Certificates []certificateItem // Optionnal.
 	Error        string            // Optionnal.
 	Refresh      int               // Optionnal. In seconds.
+	CountPrinted int               // Mandatory.
+	CountPending int               // Mandatory.
 }
 
 type certificateItem struct {
