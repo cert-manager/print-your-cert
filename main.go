@@ -200,7 +200,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		switch {
 		case k8serrors.IsAlreadyExists(err):
 			w.WriteHeader(409)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Error: "This email has already been used for creating a certificates."})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Error: "This email has already been used for creating a certificate."})
 			log.Printf("GET /: cannot create due to duplicate certificate name %s", certName)
 			return
 		case err != nil:
