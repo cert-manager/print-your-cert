@@ -90,6 +90,26 @@ For example:
 
 <https://maelvls.dev/print-your-cert/?asn1=MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUwIwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEzMDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFyIDxmb28uYmFyQGJhci5mb28%2BMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtmGM5lil9Vw%2Fy5LhpgO8t5gSb5oUo%2BDp5vWw0Z5C7rjvifi0%2FeD9MbVFkxb%2B%2BhmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF67KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74%2BNl6tyjlMOsTHv%2BLY0jPfmAtO6eR%2BEf%2FHvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94YcpgsJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh%2FQRv8ksX%2BOupHTNdH06WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH%2FBAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggqhkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIgaPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc%3D>
 
+
+> How do we get this URL? A PEM certificate looks like this:
+> 
+>   -----BEGIN CERTIFICATE-----
+>   MIIDBzCCAe+gAwIBAgIJAOjyPj/8QWbTMBQUAMIGLMQswCQYD
+>   ...
+>   -----END CERTIFICATE-----
+>
+> Since the certificate has to be encoded in base64, we need to remove the
+> -----BEGIN CERTIFICATE----- and -----END CERTIFICATE----- lines to reduce the
+> size.
+>
+> We use the query parameter "asn1" and give it the base64 and URL encoded PEM
+> content. For example, given the PEM above, we remove the headers, and since
+> it is already base64, we just need to URL encode it. It looks like this:
+>
+>   ?asn1=MIIDBzCCAe%2BgAwIBAgIJAOjyPj%2F8QWbTMBQUAMIGLMQswCQYD%0A
+>
+
+
 On the certificate page, the participant can also see their certificate by
 clicking on the button "Print your certificate". The PEM-encoded certificate is
 shown in the browser:
