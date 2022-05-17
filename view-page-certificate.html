@@ -20,8 +20,8 @@
       <h1 class="mainTitle">Print Your Certificate</h1>
       <div class="divider"></div>
       <div>
-        <h2>Hi, {{.Name}} <{{.Email}}>!</h2>
         {{if .Certificate}}
+        <h2>Hi, <code>{{.Certificate.Subject}}</code>!</h2>
         <div class="panel large">
           <div class="content">{{template "certificate" .Certificate}}</div>
           <img
@@ -30,6 +30,10 @@
             class="iconTop"
           />
         </div>
+        {{end}} {{if .Error}}
+        <div class="error">{{.Error}}</div>
+        {{end}} {{if .Message}}
+        <div class="content">{{.Message}}</div>
         {{end}}
       </div>
 

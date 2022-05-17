@@ -21,7 +21,7 @@
       <h1 class="mainTitle">Print Your Certificate</h1>
       <div class="divider"></div>
 
-      <form method="GET" action="/certificate" class="form">
+      <form method="GET" action="/" class="form">
         <p>
           Fill in your details and create your very own certificate which it
           will printed for your.
@@ -48,6 +48,8 @@
         <button type="submit">Get your certificate</button>
       </form>
       <div class="push"></div>
+
+      <p>{{.Count}} certificates have already been printed!</p>
     </div>
     <footer>
       <p>
