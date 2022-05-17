@@ -145,6 +145,10 @@ button:hover {
   color: #00b432;
 }
 
+.error > a {
+  color: #004bbb;
+}
+
 .panel {
   box-sizing: border-box;
   max-width: 500px;
