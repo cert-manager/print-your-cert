@@ -377,8 +377,9 @@ func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interfac
 		cert, err := cmclient.CertmanagerV1().Certificates(*namespace).Get(r.Context(), certName, metav1.GetOptions{})
 		switch {
 		case k8serrors.IsNotFound(err):
+			w.WriteHeader(404)
 			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Error: fmt.Sprintf("The certificate named '%s' does not exist.", certName)})
-			log.Printf("GET /certificate: the certificate named %s in namespace %s for %s in Kubernetes: %v", certName, *namespace, err)
+			log.Printf("GET /certificate: the certificate named %s in namespace %s was not found in Kubernetes: %v", certName, *namespace, err)
 			return
 		case err != nil:
 			w.WriteHeader(500)

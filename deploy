@@ -12,7 +12,7 @@ deploy() {
 }
 deploy
 while true; do
-    sleep 1m
+    sleep 10s
     git remote update
     if git merge-base --is-ancestor origin/main main; then
         echo No new commit, skipping
