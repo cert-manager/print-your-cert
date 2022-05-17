@@ -21,7 +21,7 @@
       <h1 class="mainTitle">Print Your Certificate</h1>
       <div class="divider"></div>
 
-      <form method="GET" action="/" class="form">
+      <form method="GET" action="/certificate" class="form">
         <p>
           Fill in your details and create your very own certificate which it
           will printed for your.
@@ -45,9 +45,7 @@
           <div class="error">{{.Error}}</div>
           {{end}}
         </div>
-        <button type="submit" {{if not .CanPrint}} disabled {{end}}>
-          Get your certificate
-        </button>
+        <button type="submit">Get your certificate</button>
       </form>
       <div class="push"></div>
     </div>

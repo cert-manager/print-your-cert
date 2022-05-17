@@ -126,21 +126,21 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		// provided yet.
 		if personName == "" && email == "" {
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Message: "Welcome! To get your certificate, fill in your name and email."})
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Message: "Welcome! To get your certificate, fill in your name and email."})
 			return
 		}
 
 		// Let's check that both the email and name have been entered.
 		if personName == "" && email != "" || personName != "" && email == "" {
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Message: "Please fill in both the email and name."})
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Message: "Please fill in both the email and name."})
 			log.Printf("GET /: the user has given an empty name %q or an empty email %q", personName, email)
 			return
 		}
 
 		if !valid(email) {
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "The email is invalid."})
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Error: "The email is invalid."})
 			log.Printf("GET /: the user %q has given an invalid email %q", personName, email)
 			return
 		}
@@ -153,7 +153,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		if len(commonName) > 64 {
 			msg := fmt.Sprintf("Oops, the common name formed using your name and email (%s) counts as %d bytes which goes beyond the common name limit of 64 bytes. Could you try abbreviating some part of your name and try again?", commonName, len(commonName))
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: msg})
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Error: msg})
 			log.Printf("GET /: the user %q has given a common name %q that is above the 64 bytes limit", personName, commonName)
 			return
 		}
@@ -183,18 +183,18 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 				},
 			}, metav1.CreateOptions{})
 			if err != nil {
-				tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Error: "There was an error creating your certificate. The page will be reloaded every 5 seconds until this issue is resolved."})
+				tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Error: "There was an error creating your certificate. The page will be reloaded every 5 seconds until this issue is resolved."})
 				log.Printf("GET /: issue while creating the Certificate named %s in namespace %s for '%s <%s>' in Kubernetes: %v", certName, *namespace, personName, email, err)
 				return
 			}
 
 			w.WriteHeader(201)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Message: "A certificate was successfully requested. The page will be reloaded every 5 seconds until the certificate is issued."})
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Message: "A certificate was successfully requested. The page will be reloaded every 5 seconds until the certificate is issued."})
 			log.Printf("GET /: successfully created a certificate named %s in namespace %s for '%s <%s>' in Kubernetes", certName, *namespace, personName, email)
 			return
 		case err != nil:
 			w.WriteHeader(500)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Error: "Failed getting the Certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved."})
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Error: "Failed getting the Certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved."})
 			log.Printf("GET /: while getting the Certificate %s in namespace %s in Kubernetes: %v", certName, *namespace, err)
 			return
 		}
@@ -212,7 +212,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		// if it is ready.
 		if !isReady(cert) {
 			w.WriteHeader(423)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Message: "Your certificate is not ready yet. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Message: "Your certificate is not ready yet. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
 			log.Printf("GET /: the requested certificate %s in namespace %s is not ready yet.", certName, *namespace)
 			return
 		}
@@ -221,7 +221,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
 		if err != nil {
 			w.WriteHeader(423)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Error: "A certificate already exists, but the Secret does not exist; the page will be reloaded in 5 seconds until this issue is resolved.", Debug: debugMsg})
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Error: "A certificate already exists, but the Secret does not exist; the page will be reloaded in 5 seconds until this issue is resolved.", Debug: debugMsg})
 			log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, *namespace, cert.Spec.SecretName)
 			return
 		}
@@ -231,7 +231,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		certPem, ok := secret.Data["tls.crt"]
 		if !ok {
 			w.WriteHeader(423)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Refresh: 5, Error: "Internal issue with the stored certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Error: "Internal issue with the stored certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
 			log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
 			return
 		}
@@ -241,7 +241,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		x509Cert, err := x509.ParseCertificate(certBlock.Bytes)
 		if err != nil {
 			w.WriteHeader(500)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Error: "Internal issue with parsing the issued certificate when parsing it.", Debug: debugMsg})
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Error: "Internal issue with parsing the issued certificate when parsing it.", Debug: debugMsg})
 			log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s contains in its tls.crt field an invalid PEM certificate", certName, *namespace, cert.Spec.SecretName)
 			return
 		}
@@ -261,7 +261,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 			errMsg = "Warning: the name is different from the name in the certificate we already have for this email. Each certificate is associate to an email, and although you cannot change the name of a certificate once it is issued, but you can use another email to create a new certificate."
 		}
 		certificateHTMLData := certificateToHTML(x509Cert)
-		_ = tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Name: personName, Email: email, Certificate: &certificateHTMLData, Error: errMsg, CanPrint: canPressPrintButton, MarkedToBePrinted: stillToBePrinted, AlreadyPrinted: alreadyPrinted, Debug: debugMsg})
+		_ = tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Certificate: &certificateHTMLData, Error: errMsg, CanPrint: canPressPrintButton, MarkedToBePrinted: stillToBePrinted, AlreadyPrinted: alreadyPrinted, Debug: debugMsg})
 	}
 }
 
@@ -386,7 +386,7 @@ func download(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 		certPem, ok := secret.Data["tls.crt"]
 		if !ok {
 			http.Error(w, "The Secret does not contain a certificate, try again later.", 423)
-			tmpl.ExecuteTemplate(w, "landing.html", tmplDataLandingGET{Email: email, Error: "Internal issue with the stored certificate in Kubernetes."})
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Email: email, Error: "Internal issue with the stored certificate in Kubernetes."})
 			log.Printf("GET /download: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
 			return
 		}
@@ -400,12 +400,170 @@ func download(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 	}
 }
 
+func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/certificate" {
+			http.Error(w, fmt.Sprintf("The path %s contains is expected to be /.", r.URL.Path), http.StatusNotFound)
+			return
+		}
+
+		if r.Method != "GET" {
+			http.Error(w, fmt.Sprintf("The method %s is not allowed on %s", r.Method, r.URL.Path), http.StatusMethodNotAllowed)
+			return
+		}
+
+		personName := r.URL.Query().Get("name")
+		email := r.URL.Query().Get("email")
+
+		// Happily return early if the name or email haven't been
+		// provided yet.
+		if personName == "" && email == "" {
+			w.WriteHeader(400)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Message: "Welcome! To get your certificate, fill in your name and email."})
+			return
+		}
+
+		// Let's check that both the email and name have been entered.
+		if personName == "" && email != "" || personName != "" && email == "" {
+			w.WriteHeader(400)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Message: "Please fill in both the email and name."})
+			log.Printf("GET /: the user has given an empty name %q or an empty email %q", personName, email)
+			return
+		}
+
+		if !valid(email) {
+			w.WriteHeader(400)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Error: "The email is invalid."})
+			log.Printf("GET /: the user %q has given an invalid email %q", personName, email)
+			return
+		}
+
+		// Check that the "Name <email@foo.bar>" is under the common
+		// name limit of 64 bytes. Hopefully, that should be enough for
+		// most people, but let's help them out in case their name and
+		// email go above the limit.
+		commonName := fmt.Sprintf("%s <%s>", personName, email)
+		if len(commonName) > 64 {
+			msg := fmt.Sprintf("Oops, the common name formed using your name and email (%s) counts as %d bytes which goes beyond the common name limit of 64 bytes. Could you try abbreviating some part of your name and try again?", commonName, len(commonName))
+			w.WriteHeader(400)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Error: msg})
+			log.Printf("GET /: the user %q has given a common name %q that is above the 64 bytes limit", personName, commonName)
+			return
+		}
+
+		// The email mael@vls.dev is transformed to mael-vls.dev so
+		// that we can use it as a "name" in Kubernetes. We don't
+		// expect any clashes since this project is meant to be used
+		// just for the duration of KubeCon EU 2022.
+		certName := emailToCertName(email)
+		cert, err := cmclient.CertmanagerV1().Certificates(*namespace).Get(r.Context(), certName, metav1.GetOptions{})
+		switch {
+		case k8serrors.IsNotFound(err):
+			// Create the Certificate.
+			cert, err = cmclient.CertmanagerV1().Certificates(*namespace).Create(r.Context(), &certmanagerv1.Certificate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: certName,
+				},
+				Spec: certmanagerv1.CertificateSpec{
+					CommonName: commonName,
+					Duration:   &metav1.Duration{Duration: 3 * 3650 * 24 * time.Hour}, // 30 years.
+					SecretName: certName,
+					IssuerRef: cmmetav1.ObjectReference{
+						Name:  *issuer,
+						Kind:  *issuerKind,
+						Group: *issuerGroup,
+					},
+				},
+			}, metav1.CreateOptions{})
+			if err != nil {
+				tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Error: "There was an error creating your certificate. The page will be reloaded every 5 seconds until this issue is resolved."})
+				log.Printf("GET /: issue while creating the Certificate named %s in namespace %s for '%s <%s>' in Kubernetes: %v", certName, *namespace, personName, email, err)
+				return
+			}
+
+			w.WriteHeader(201)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Message: "A certificate was successfully requested. The page will be reloaded every 5 seconds until the certificate is issued."})
+			log.Printf("GET /: successfully created a certificate named %s in namespace %s for '%s <%s>' in Kubernetes", certName, *namespace, personName, email)
+			return
+		case err != nil:
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Error: "Failed getting the Certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved."})
+			log.Printf("GET /: while getting the Certificate %s in namespace %s in Kubernetes: %v", certName, *namespace, err)
+			return
+		}
+
+		debug := r.URL.Query().Get("debug") != ""
+		debugMsg := ""
+		if debug {
+			debugMsg += fmt.Sprintf("The annotation 'print' is set to '%s'.\nThe certificate conditions are:", cert.Annotations[AnnotationPrint])
+			for _, cond := range cert.Status.Conditions {
+				debugMsg += fmt.Sprintf("\n  %s: %s (%s: %s)", cond.Type, cond.Status, cond.Reason, cond.Message)
+			}
+		}
+
+		// Success: we found the Certificate in Kubernetes. Let us see
+		// if it is ready.
+		if !isReady(cert) {
+			w.WriteHeader(423)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Message: "Your certificate is not ready yet. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
+			log.Printf("GET /: the requested certificate %s in namespace %s is not ready yet.", certName, *namespace)
+			return
+		}
+
+		// Let's show the user the Certificate.
+		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
+		if err != nil {
+			w.WriteHeader(423)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Error: "A certificate already exists, but the Secret does not exist; the page will be reloaded in 5 seconds until this issue is resolved.", Debug: debugMsg})
+			log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, *namespace, cert.Spec.SecretName)
+			return
+		}
+
+		// Let's show the user the Certificate. First, parse the X.509
+		// certificate from the Secret.
+		certPem, ok := secret.Data["tls.crt"]
+		if !ok {
+			w.WriteHeader(423)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Refresh: 5, Error: "Internal issue with the stored certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
+			log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
+			return
+		}
+
+		// Parse the certificate.
+		certBlock, _ := pem.Decode(certPem)
+		x509Cert, err := x509.ParseCertificate(certBlock.Bytes)
+		if err != nil {
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Error: "Internal issue with parsing the issued certificate when parsing it.", Debug: debugMsg})
+			log.Printf("GET /: the requested certificate %s in namespace %s exists, but the Secret %s contains in its tls.crt field an invalid PEM certificate", certName, *namespace, cert.Spec.SecretName)
+			return
+		}
+
+		alreadyPrinted := isAlreadyPrinted(cert)
+		stillToBePrinted := markedToBePrinted(cert) && !alreadyPrinted
+
+		canPressPrintButton := !stillToBePrinted && !alreadyPrinted
+
+		// Let's show the user the Certificate. Since we can't change
+		// the name of a given certificate, and the UI doesn't make it
+		// clear, let us also warn the user that each certificate is
+		// associated with a specific email, and that when the
+		// certificate is already issued, the name cannot be changed.
+		errMsg := ""
+		if cert.Spec.CommonName != commonName {
+			errMsg = "Warning: the name is different from the name in the certificate we already have for this email. Each certificate is associate to an email, and although you cannot change the name of a certificate once it is issued, but you can use another email to create a new certificate."
+		}
+		certificateHTMLData := certificateToHTML(x509Cert)
+		_ = tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Name: personName, Email: email, Certificate: &certificateHTMLData, Error: errMsg, CanPrint: canPressPrintButton, MarkedToBePrinted: stillToBePrinted, AlreadyPrinted: alreadyPrinted, Debug: debugMsg})
+	}
+}
+
 // The user can "visualize" their certificate. This page is similar to the one
 // on GitHub Pages (https://cert-manager.github.io/print-your-cert?asn1=...)
 // except that is also shows whether the certificate was printed or not.
 //
 //  GET /certificate?email=mael%40vls.dev HTTP/2.0
-func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
+func certificate2Page(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.Error(w, fmt.Sprintf("The path %s contains is expected to be /.", r.URL.Path), http.StatusNotFound)
@@ -538,19 +696,19 @@ func listPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 		// Let's get the list of certificates.
 		certs, err := cmclient.CertmanagerV1().Certificates(*namespace).List(r.Context(), metav1.ListOptions{})
 		if err != nil {
-			tmpl.ExecuteTemplate(w, "list.html", tmplDataListGET{Error: "Internal error: cannot list the last certificates that were printed."})
+			tmpl.ExecuteTemplate(w, "list.html", listPageData{Error: "Internal error: cannot list the last certificates that were printed."})
 			log.Printf("GET /list: %v", err)
 			return
 		}
 
-		var certsOut []tmplDataListCert
+		var certsOut []certificateItem
 		for _, cert := range certs.Items {
-			certsOut = append(certsOut, tmplDataListCert{
+			certsOut = append(certsOut, certificateItem{
 				CommonName: cert.Spec.CommonName,
 				State:      stateOfCert(cert),
 			})
 		}
-		tmpl.ExecuteTemplate(w, "list.html", tmplDataListGET{Certificates: certsOut, Refresh: refresh})
+		tmpl.ExecuteTemplate(w, "list.html", listPageData{Certificates: certsOut, Refresh: refresh})
 	}
 }
 
@@ -587,16 +745,16 @@ func stateOfCert(cert certmanagerv1.Certificate) StateCert {
 }
 
 type tmplDataLandingGET struct {
-	Name              string                       // Optional.
-	Email             string                       // Optional.
-	Certificate       *tmplDataCertificateTemplate // Optional.
-	Error             string                       // Optional.
-	Message           string                       // Optional.
-	CanPrint          bool                         // Optional.
-	AlreadyPrinted    bool                         // Optional.
-	MarkedToBePrinted bool                         // Optional.
-	Debug             string                       // Optional.
-	Refresh           int                          // Optional. In seconds.
+	Name              string                   // Optional.
+	Email             string                   // Optional.
+	Certificate       *certificateTemplateData // Optional.
+	Error             string                   // Optional.
+	Message           string                   // Optional.
+	CanPrint          bool                     // Optional.
+	AlreadyPrinted    bool                     // Optional.
+	MarkedToBePrinted bool                     // Optional.
+	Debug             string                   // Optional.
+	Refresh           int                      // Optional. In seconds.
 }
 
 type tmplDataLandingPOST struct {
@@ -615,18 +773,18 @@ var (
 	StatePrinted      StateCert = "Printed"
 )
 
-type tmplDataListGET struct {
-	Certificates []tmplDataListCert // Optionnal.
-	Error        string             // Optionnal.
-	Refresh      int                // Optionnal. In seconds.
+type listPageData struct {
+	Certificates []certificateItem // Optionnal.
+	Error        string            // Optionnal.
+	Refresh      int               // Optionnal. In seconds.
 }
 
-type tmplDataListCert struct {
+type certificateItem struct {
 	CommonName string
 	State      StateCert
 }
 
-type tmplDataCertificateTemplate struct {
+type certificateTemplateData struct {
 	PublicKeyAlgorithm string
 	Serial             string
 	Subject            string
@@ -636,20 +794,20 @@ type tmplDataCertificateTemplate struct {
 }
 
 type certificatePageData struct {
-	Name              string                       // Optional.
-	Email             string                       // Optional.
-	Certificate       *tmplDataCertificateTemplate // Optional.
-	Error             string                       // Optional.
-	Message           string                       // Optional.
-	CanPrint          bool                         // Optional.
-	AlreadyPrinted    bool                         // Optional.
-	MarkedToBePrinted bool                         // Optional.
-	Debug             string                       // Optional.
-	Refresh           int                          // Optional. In seconds.
+	Name              string                   // Optional.
+	Email             string                   // Optional.
+	Certificate       *certificateTemplateData // Optional.
+	Error             string                   // Optional.
+	Message           string                   // Optional.
+	CanPrint          bool                     // Optional.
+	AlreadyPrinted    bool                     // Optional.
+	MarkedToBePrinted bool                     // Optional.
+	Debug             string                   // Optional.
+	Refresh           int                      // Optional. In seconds.
 }
 
-func certificateToHTML(cert *x509.Certificate) tmplDataCertificateTemplate {
-	data := tmplDataCertificateTemplate{
+func certificateToHTML(cert *x509.Certificate) certificateTemplateData {
+	data := certificateTemplateData{
 		PublicKeyAlgorithm: getPublicKeyAlgorithm(cert.PublicKeyAlgorithm, cert.PublicKey),
 		Serial:             cert.SerialNumber.String(),
 		Subject:            cert.Subject.CommonName,
