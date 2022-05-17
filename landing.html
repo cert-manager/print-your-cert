@@ -41,7 +41,9 @@
             required
             placeholder="Your email address"
           />
+          {{if .Error}}
           <div class="error">{{.Error}}</div>
+          {{end}}
         </div>
         <button type="submit" {{if not .CanPrint}} disabled {{end}}>
           Get your certificate
