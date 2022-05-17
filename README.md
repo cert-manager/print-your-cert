@@ -20,7 +20,7 @@
 
 ## What is this experiment?
 
-⚠️  The URLs an IPs presented in this README are guarenteed to work from 18 to
+⚠️ The URLs an IPs presented in this README are guarenteed to work from 18 to
 20 May 2022, but may stop working afterwards.
 
 When visiting the cert-manager booth, you will be welcomed and one of the staff
@@ -110,7 +110,6 @@ For example:
 
 <https://maelvls.dev/print-your-cert/?asn1=MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUwIwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEzMDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFyIDxmb28uYmFyQGJhci5mb28%2BMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtmGM5lil9Vw%2Fy5LhpgO8t5gSb5oUo%2BDp5vWw0Z5C7rjvifi0%2FeD9MbVFkxb%2B%2BhmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF67KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74%2BNl6tyjlMOsTHv%2BLY0jPfmAtO6eR%2BEf%2FHvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94YcpgsJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh%2FQRv8ksX%2BOupHTNdH06WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH%2FBAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggqhkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIgaPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc%3D>
 
-
 > <a id=asn1></a> **⁉️ How do we get this URL?** First, take a PEM-encoded
 > certificate. It will looks like this:
 >
@@ -125,8 +124,7 @@ For example:
 > It takes three steps to turn this PEM-encoded certificate into something that
 > can be given with the query parameter `?asn1=...`.
 >
-> 1. We remove the header and footer, i.e., we remove the lines `----c-BEGIN
->    CERTIFICATE-----` and `-----END CERTIFICATE-----`). The result looks like
+> 1. We remove the header and footer, i.e., we remove the lines `----c-BEGIN CERTIFICATE-----` and `-----END CERTIFICATE-----`). The result looks like
 >    this:
 >
 >    ```text
@@ -306,6 +304,7 @@ docker run -d --restart=always --name print-your-cert-ui --net=host -v $HOME/.ku
 ### Local development on the UI
 
 You will need the following tools installed:
+
 - [Go](https://go.dev/doc/install) (1.17 or above),
 - [K3d](https://k3d.io/stable/#install-current-latest-release),
 - [Helm](https://helm.sh/docs/intro/install/).
@@ -663,4 +662,3 @@ CADDY
 sudo systemctl restart caddy.service
 EOF
 ```
-

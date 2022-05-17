@@ -9,12 +9,12 @@
       href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="static/styles.css" />
   </head>
 
   <body>
     <div class="wrapper">
-      <img src="images/logo.svg" alt="Logo" />
+      <img src="static/images/logo.svg" alt="Logo" />
       <h1 class="mainTitle">Print Your Certificate</h1>
       <div class="divider"></div>
       <div>
@@ -22,7 +22,11 @@
         {{if .Certificate}}
         <div class="panel large">
           <div class="content">{{template "certificate" .Certificate}}</div>
-          <img src="images/certificate-icon.svg" alt="" class="iconTop" />
+          <img
+            src="static/images/certificate-icon.svg"
+            alt=""
+            class="iconTop"
+          />
         </div>
         {{end}}
       </div>

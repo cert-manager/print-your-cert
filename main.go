@@ -80,9 +80,14 @@ func Config(inCluster bool, kubeconfig string) (cfg *rest.Config, err error) {
 	return cfg, nil
 }
 
+//go:embed static/js/*.js
+//go:embed static/*.css
+//go:embed static/images/*
+var static embed.FS
+
 //go:embed *.html
-var content embed.FS
-var tmpl = template.Must(template.ParseFS(content, "*.html"))
+var templates embed.FS
+var tmpl = template.Must(template.ParseFS(templates, "*.html"))
 
 // When the user lands on the website for the first time, they will get a
 // blank form prompting them to fill in their name and email to receive a
@@ -395,6 +400,117 @@ func download(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 	}
 }
 
+// The user can "visualize" their certificate. This page is similar to the one
+// on GitHub Pages (https://cert-manager.github.io/print-your-cert?asn1=...)
+// except that is also shows whether the certificate was printed or not.
+//
+//  GET /certificate?email=mael%40vls.dev HTTP/2.0
+func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.Error(w, fmt.Sprintf("The path %s contains is expected to be /.", r.URL.Path), http.StatusNotFound)
+			return
+		}
+
+		if r.Method != "GET" {
+			http.Error(w, fmt.Sprintf("The method %s is not allowed on %s", r.Method, r.URL.Path), http.StatusMethodNotAllowed)
+			return
+		}
+
+		email := r.URL.Query().Get("email")
+
+		// Happily return early if the name or email haven't been
+		// provided yet.
+		if email == "" {
+			w.WriteHeader(400)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Email: email, Message: "Welcome! To get your certificate, fill in your name and email."})
+			return
+		}
+
+		if !valid(email) {
+			w.WriteHeader(400)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Email: email, Error: "The email is invalid."})
+			log.Printf("GET /certificate: invalid email %q", email)
+			return
+		}
+
+		// The email mael@vls.dev is transformed to mael-vls.dev so
+		// that we can use it as a "name" in Kubernetes. We don't
+		// expect any clashes since this project is meant to be used
+		// just for the duration of KubeCon EU 2022.
+		certName := emailToCertName(email)
+
+		cert, err := cmclient.CertmanagerV1().Certificates(*namespace).Get(r.Context(), certName, metav1.GetOptions{})
+		switch {
+		case k8serrors.IsNotFound(err):
+			w.WriteHeader(404)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Email: email, Error: fmt.Sprintf("There is no certificate registered with the email %s.", email)})
+			log.Printf("GET /certificate: the certificate named %s in namespace %s for email %s in Kubernetes: %v", certName, *namespace, email, err)
+			return
+		case err != nil:
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "view-page-certificate.html", certificatePageData{Email: email, Refresh: 5, Error: "Failed getting the Certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved."})
+			log.Printf("GET /certificate: while getting the Certificate %s in namespace %s in Kubernetes: %v", certName, *namespace, err)
+			return
+		}
+
+		debug := r.URL.Query().Get("debug") != ""
+		debugMsg := ""
+		if debug {
+			debugMsg += fmt.Sprintf("The annotation 'print' is set to '%s'.\nThe certificate conditions are:", cert.Annotations[AnnotationPrint])
+			for _, cond := range cert.Status.Conditions {
+				debugMsg += fmt.Sprintf("\n  %s: %s (%s: %s)", cond.Type, cond.Status, cond.Reason, cond.Message)
+			}
+		}
+
+		// Success: we found the Certificate in Kubernetes. Let us see
+		// if it is ready.
+		if !isReady(cert) {
+			w.WriteHeader(423)
+			tmpl.ExecuteTemplate(w, "landing.html", certificatePageData{Email: email, Refresh: 5, Message: "Your certificate is not ready yet. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
+			log.Printf("GET /certificate: the requested certificate %s in namespace %s is not ready yet.", certName, *namespace)
+			return
+		}
+
+		// Let's show the user the Certificate.
+		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
+		if err != nil {
+			w.WriteHeader(423)
+			tmpl.ExecuteTemplate(w, "landing.html", certificatePageData{Email: email, Refresh: 5, Error: "A certificate already exists, but the Secret does not exist; the page will be reloaded in 5 seconds until this issue is resolved.", Debug: debugMsg})
+			log.Printf("GET /certificate: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, *namespace, cert.Spec.SecretName)
+			return
+		}
+
+		// Let's show the user the Certificate. First, parse the X.509
+		// certificate from the Secret.
+		certPem, ok := secret.Data["tls.crt"]
+		if !ok {
+			w.WriteHeader(423)
+			tmpl.ExecuteTemplate(w, "landing.html", certificatePageData{Email: email, Refresh: 5, Error: "Internal issue with the stored certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
+			log.Printf("GET /certificate: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
+			return
+		}
+
+		// Parse the certificate.
+		certBlock, _ := pem.Decode(certPem)
+		x509Cert, err := x509.ParseCertificate(certBlock.Bytes)
+		if err != nil {
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "landing.html", certificatePageData{Email: email, Error: "Internal issue with parsing the issued certificate when parsing it.", Debug: debugMsg})
+			log.Printf("GET /certificate: the requested certificate %s in namespace %s exists, but the Secret %s contains in its tls.crt field an invalid PEM certificate", certName, *namespace, cert.Spec.SecretName)
+			return
+		}
+
+		alreadyPrinted := isAlreadyPrinted(cert)
+		stillToBePrinted := markedToBePrinted(cert) && !alreadyPrinted
+
+		canPressPrintButton := !stillToBePrinted && !alreadyPrinted
+
+		certificateHTMLData := certificateToHTML(x509Cert)
+		_ = tmpl.ExecuteTemplate(w, "landing.html", certificatePageData{Email: email, Certificate: &certificateHTMLData, CanPrint: canPressPrintButton, MarkedToBePrinted: stillToBePrinted, AlreadyPrinted: alreadyPrinted, Debug: debugMsg})
+	}
+}
+
 // When the user goes to /list, they see a list of the previously submitted
 // name and emails.
 //
@@ -519,6 +635,19 @@ type tmplDataCertificateTemplate struct {
 	NotAfter           string
 }
 
+type certificatePageData struct {
+	Name              string                       // Optional.
+	Email             string                       // Optional.
+	Certificate       *tmplDataCertificateTemplate // Optional.
+	Error             string                       // Optional.
+	Message           string                       // Optional.
+	CanPrint          bool                         // Optional.
+	AlreadyPrinted    bool                         // Optional.
+	MarkedToBePrinted bool                         // Optional.
+	Debug             string                       // Optional.
+	Refresh           int                          // Optional. In seconds.
+}
+
 func certificateToHTML(cert *x509.Certificate) tmplDataCertificateTemplate {
 	data := tmplDataCertificateTemplate{
 		PublicKeyAlgorithm: getPublicKeyAlgorithm(cert.PublicKeyAlgorithm, cert.PublicKey),
@@ -558,6 +687,9 @@ func main() {
 	http.HandleFunc("/print", printPage(kclient, cmclient))
 	http.HandleFunc("/download", download(kclient, cmclient))
 	http.HandleFunc("/list", listPage(kclient, cmclient))
+	http.HandleFunc("/certificate", certificatePage(kclient, cmclient))
+	fs := http.FileServer(http.FS(static))
+	http.Handle("/static/", http.StripPrefix("/", fs))
 
 	fmt.Printf("Listening on http://" + *listen + ".\n")
 	if err := http.ListenAndServe(*listen, nil); err != nil {
