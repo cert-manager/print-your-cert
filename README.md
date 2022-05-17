@@ -1,5 +1,25 @@
 # The "Print you certificate!" experiment at the cert-manager booth (KubeCon EU 2022 in Valencia)
 
+- [What is this experiment?](#what-is-this-experiment)
+- [What's the stack?](#whats-the-stack)
+- [Staff: test things](#staff-test-things)
+- [Running](#running)
+  - [Build the UI (`ghcr.io/maelvls/print-your-cert-ui:latest`)](#build-the-ui-ghcriomaelvlsprint-your-cert-uilatest)
+  - [Local development on the UI](#local-development-on-the-ui)
+  - [Build `ghcr.io/maelvls/print-your-cert-controller:latest`](#build-ghcriomaelvlsprint-your-cert-controllerlatest)
+  - [Local development on the controller (that creates PNGs and prints them)](#local-development-on-the-controller-that-creates-pngs-and-prints-them)
+    - [`pem-to-png`](#pem-to-png)
+- [Troubleshooting](#troubleshooting)
+  - [From the CLI: `usb.core.USBError: [Errno 16] Resource busy`](#from-the-cli-usbcoreusberror-errno-16-resource-busy)
+  - [From the web UI: `No such file or directory: '/dev/usb/lp1'`](#from-the-web-ui-no-such-file-or-directory-devusblp1)
+- [Testing](#testing)
+- [Intial set up of the Pi](#intial-set-up-of-the-pi)
+- [Build and push the image `ghcr.io/maelvls/print-your-cert-ui:latest`](#build-and-push-the-image-ghcriomaelvlsprint-your-cert-uilatest)
+- [Testing pem-to-png](#testing-pem-to-png)
+- [Set up the tunnel between the Internet and the Pi](#set-up-the-tunnel-between-the-internet-and-the-pi)
+
+## What is this experiment?
+
 ⚠️  The URLs an IPs presented in this README are guarenteed to work from 18 to
 20 May 2022, but may stop working afterwards.
 
