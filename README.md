@@ -111,24 +111,59 @@ For example:
 <https://maelvls.dev/print-your-cert/?asn1=MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUwIwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEzMDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFyIDxmb28uYmFyQGJhci5mb28%2BMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtmGM5lil9Vw%2Fy5LhpgO8t5gSb5oUo%2BDp5vWw0Z5C7rjvifi0%2FeD9MbVFkxb%2B%2BhmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF67KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74%2BNl6tyjlMOsTHv%2BLY0jPfmAtO6eR%2BEf%2FHvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94YcpgsJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh%2FQRv8ksX%2BOupHTNdH06WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH%2FBAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggqhkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIgaPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc%3D>
 
 
-> How do we get this URL? A PEM certificate looks like this:
-> 
->   -----BEGIN CERTIFICATE-----
->   MIIDBzCCAe+gAwIBAgIJAOjyPj/8QWbTMBQUAMIGLMQswCQYD
->   ...
->   -----END CERTIFICATE-----
+> <a id=asn1></a> **⁉️ How do we get this URL?** First, take a PEM-encoded
+> certificate. It will looks like this:
 >
-> Since the certificate has to be encoded in base64, we need to remove the
-> -----BEGIN CERTIFICATE----- and -----END CERTIFICATE----- lines to reduce the
-> size.
+> ```text
+> -----BEGIN CERTIFICATE-----
+> MIIDBzCCAe+gAyPj/8QWMBQUAMIGLMQswCQYD
+> wIBAgMIG+LMQswCQYDAOPj/8QAaDMBQEFAwUa
+> ...
+> -----END CERTIFICATE-----
+> ```
 >
-> We use the query parameter "asn1" and give it the base64 and URL encoded PEM
-> content. For example, given the PEM above, we remove the headers, and since
-> it is already base64, we just need to URL encode it. It looks like this:
+> It takes three steps to turn this PEM-encoded certificate into something that
+> can be given with the query parameter `?asn1=...`.
 >
->   ?asn1=MIIDBzCCAe%2BgAwIBAgIJAOjyPj%2F8QWbTMBQUAMIGLMQswCQYD%0A
+> 1. We remove the header and footer, i.e., we remove the lines `-----BEGIN
+>    CERTIFICATE-----` and `-----END CERTIFICATE-----`). The result looks like
+>    this:
 >
-
+>    ```text
+>    MIIDBzCCAe+gAyPj/8QWMBQUAMIGLMQswCQYD
+>    wIBAgMIG+LMQswCQYDAOPj/8QAaDMBQEFAwUa
+>    ```
+>
+> 2. (optional) We can save a few bytes by removing the newlines. The result is:
+>
+>    ```text
+>    MIIDBzCCAe+gAyPj/8QWMBQUAMIGLMQswCQYDwIBAgMIG+LMQswCQYDAOPj/8QAaDMBQEFAwUa
+>    ```
+>
+> 3. At this point, we have the ASN.1 certificate encoded in base 64. We have to
+>    URL-encode it, which gives:
+>
+>    ```text
+>    MIIDBzCCAe%2BgAyPj%2F8QWMBQUAMIGLMQswCQYDwIBAgMIG%2BLMQswCQYDAOPj%2F8QAaDMBQEFAwUa%0A
+>    ```
+>
+> 4. Copy this into the URL:
+>
+>    ```text
+>    https://cert-manager.github.io/print-your-cert?asn1=MIIDBzCCAe%2BgAyPj%2F8QWMBQUAMIGLMQswCQYDwIBAgMIG%2BLMQswCQYDAOPj%2F8QAaDMBQEFAwUa%0A
+>    ```
+>
+> One-line that takes a PEM-encoded certificate and returns a URL:
+>
+> ```sh
+> cat <<EOF | grep -v CERTIFICATE | tr -d $'\n' | python3 -c "import urllib.parse; print(urllib.parse.quote_plus(open(0).read()))" | (printf "https://cert-manager.github.io/print-your-cert?asn1="; cat)
+> -----BEGIN CERTIFICATE-----
+> MIIDBzCCAe+gAyPj/8QWMBQUAMIGLMQswCQYD
+> wIBAgMIG+LMQswCQYDAOPj/8QAaDMBQEFAwUa
+> ...
+> -----END CERTIFICATE-----
+> EOF
+> ```
 
 On the certificate page, the participant can also see their certificate by
 clicking on the button "Print your certificate". The PEM-encoded certificate is
@@ -137,7 +172,7 @@ shown in the browser:
 <img alt="download" src="https://user-images.githubusercontent.com/2195781/168419122-1bf3d0dd-c474-4d47-a55e-56980ed16441.png" width="500"/>
 
 On the booth, we have a 42-inch display showing the list of certificates
-(<https://print-your-cert.mael.pw/list>):
+(<https://print-your-cert.cert-manager.xyz/list>):
 
 <img alt="list" src="https://user-images.githubusercontent.com/2195781/168419219-fb3e5eb7-672e-4792-9ac3-40cf8e6b251d.png" width="300"/>
 
@@ -148,7 +183,7 @@ point so that people can verify the signature.
 ## What's the stack?
 
 ```text
-https://print-your-cert.mael.pw
+https://print-your-cert.cert-manager.xyz
                 |
                 |
                 v
@@ -184,7 +219,7 @@ things:
 - [Install tailscale](https://tailscale.com/download/).
 - Run `tailscale up`, it should open something in your browser → "Sign in
   with GitHub" → Authorize Tailscale → Multi-user Tailnet cert-manager.
-- If <http://print-your-cert.mael.pw/> doesn't work, then the frontend UI
+- If <http://print-your-cert.cert-manager.xyz/> doesn't work, then the frontend UI
   is at <http://100.121.173.5:8080/>.
 - You can test that the printer works at <http://100.121.173.5:8013/>.
 - You can SSH into the Pi (which runs a Kubernetes cluster) as long as
@@ -530,13 +565,12 @@ brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 pem-
 > [public-ip-on-my-machine-using-wireguard](https://hackmd.io/@maelvls/public-ip-on-my-machine-using-wireguard).
 
 I want to expose the print-your-cert-ui on the Internet on
-<https://print-your-cert.mael.pw>, so I need to set up a TCP tunnel towards the
+<https://print-your-cert.cert-manager.xyz>, so I need to set up a TCP tunnel towards the
 Pi. I use Tailscale and Caddy on a GCP e2-micro VM (because f1-micro isn't
 available in Spain).
 
 ```text
-
-https://print-your-cert.mael.pw
+https://print-your-cert.cert-manager.xyz
               |
               |
               v  34.175.62.123 (eth0)
@@ -593,7 +627,7 @@ Then, I copy-pasted the IP into the mael.pw zone:
    record:
 
    ```text
-   print-your-cert.mael.pw.     300     IN      A      34.175.254.25
+   print-your-cert.cert-manager.xyz.     300     IN      A      34.175.254.25
    ```
 
 Then, I installed Tailscale and made sure IP forwarding is enabled on the VM:
@@ -622,10 +656,11 @@ EOF
 ```sh
 gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- bash <<'EOF'
 sudo tee /etc/caddy/Caddyfile <<CADDY
-print-your-cert.mael.pw:443 {
+print-your-cert.cert-manager.xyz:443 {
         reverse_proxy $(tailscale ip -4 pi):8080
 }
 CADDY
 sudo systemctl restart caddy.service
 EOF
 ```
+
