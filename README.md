@@ -254,8 +254,8 @@ EOF
 ```sh
 # Multi-arch pushed to registry:
 GOARCH=arm64 go build -o print-your-cert-ui-arm64 .
-GOARCH=amd64 go build -o print-your-cert-ui-amd64 .
-docker buildx build -f Dockerfile.ui --platform amd64,linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-ui:latest --push
+GOARCH=amd64 CGO_ENABLED=0 go build -o print-your-cert-ui-amd64 .
+docker buildx build -f Dockerfile.ui --platform amd64,linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-ui:latest --push .
 
 # Quicker: push directly to the Pi:
 GOARCH=arm64 go build -o print-your-cert-ui-arm64 .
