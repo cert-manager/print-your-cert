@@ -14,36 +14,40 @@
 
   <body>
     <div class="wrapper">
-      <br />
       <img src="images/logo.svg" alt="Logo" />
       <h1 class="mainTitle">Print Your Certificate</h1>
       <div class="divider"></div>
-      <h2 class="secondaryTitle">Last certificates that were printed</h1>
-        <div class="panel large">
-          <div class="content">
-            <table>
-              <thead class="header">
-                  <tr>
-                      <th>#</th>
-                      <th>Common name</th>
-                      <th>State</th>
-                  </tr>
-              </thead>
-              <tbody>
-                {{range .Certificates}}
-                <tr>
-                  <td class="bold">1.</td>
-                    <td class="bold">{{.CommonName}}</td>
-                    <td>{{.State}}</td>
-                </tr>
-                {{end}}
-                  
-              </tbody>
-              </table>
-          </div>
-
+      <div>
+        <h2>Hi, {{.Name}} <{{.Email}}>!</h2>
+        <p>Here is your certificate:</p>
+        {{if .Certificate}}
+        <div class="panel">
+          <div class="content">{{template "certificate" .Certificate}}</div>
+          <img src="images/certificate-icon.svg" alt="" class="iconBottom" />
         </div>
-        
+        {{end}} {{if .AlreadyPrinted}}
+        <div class="success">The certificate has already been printed.</div>
+        {{end}} {{if .MarkedToBePrinted}}
+        <div class="success">The certificate is waiting to be printed.</div>
+        {{end}}
+        <div>
+          <form method="POST" action="/print">
+            <input name="name" type="text" value="{{.Name}}" hidden />
+            <input name="email" type="text" value="{{.Email}}" hidden />
+            <button type="submit" class="constrain">Send to print</button>
+          </form>
+          <br />
+          <form method="GET" action="/download">
+            <input name="email" type="text" value="{{.Email}}" hidden />
+
+            <p style="color: darkgreen"></p>
+            <button type="submit" class="constrain">
+              Download in PEM format
+            </button>
+          </form>
+        </div>
+      </div>
+
       <div class="push"></div>
     </div>
     <footer>

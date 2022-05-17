@@ -1,0 +1,218 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+html {
+  background: radial-gradient(50% 50% at 50% 50%, #3686ff 0%, #004bbb 100%)
+    no-repeat;
+  background-attachment: fixed;
+  font-family: "Montserrat", Helvetica, Arial, serif;
+  color: #fff;
+  font-size: 16px;
+}
+
+.wrapper {
+  padding: 0 20px;
+  min-height: 100%;
+  margin: 0 auto -130px;
+}
+.push {
+  height: 200px;
+}
+body {
+  text-align: center;
+}
+a {
+  color: #fff;
+}
+a:hover {
+  color: #fff;
+}
+h2 {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 30px;
+  text-align: center;
+  color: #ffffff;
+  max-width: 500px;
+  margin: 20px auto;
+}
+
+p {
+  font-weight: 300;
+  line-height: 30px;
+  letter-spacing: 0.5px;
+}
+
+.mainTitle {
+  text-transform: uppercase;
+  font-size: 26px;
+  line-height: 32px;
+  letter-spacing: 0.1em;
+  text-shadow: 0px 4px 5px rgba(0, 0, 0, 0.15);
+  margin-top: -40px;
+}
+.divider {
+  display: inline-block;
+  width: 300px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  margin: 10px 0 40px 0;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  grid-gap: 35px;
+  max-width: 430px;
+  margin: 0 auto;
+}
+
+.form input {
+  width: 100%;
+  height: 50px;
+  border-radius: 6px;
+  border: none;
+  text-align: center;
+  color: #014bbc;
+  font-weight: 500;
+  font-size: 14px;
+  text-transform: uppercase;
+  font-family: "Montserrat", Helvetica, Arial, serif;
+  letter-spacing: 0.2em;
+  line-height: 30px;
+  box-shadow: 0px 0px 59px 1px rgba(0, 0, 0, 0.15);
+}
+.form input::placeholder {
+  color: #014bbc;
+  opacity: 0.5;
+}
+button {
+  background: #0400ba;
+  border-radius: 6px;
+  border: 0;
+  filter: drop-shadow(0px 4px 4px rgba(0, 0, 0, 0.25));
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 17px;
+  text-align: center;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transition: all 0.3s ease-in-out;
+  height: 55px;
+  cursor: pointer;
+  color: #ffffff;
+  padding: 0px 40px;
+}
+button.constrain {
+  display: inline-block;
+  width: auto;
+}
+button:hover {
+  background-color: #0500ff;
+}
+.error,
+.success {
+  box-sizing: border-box;
+  background-color: #fff;
+  padding: 20px 10px 10px 10px;
+  color: red;
+  width: 101%;
+  margin-top: -10px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 24px;
+  text-align: center;
+  color: #ff0000;
+}
+.success {
+  padding: 10px;
+  max-width: 500px;
+  margin: 0 auto;
+  margin-bottom: 20px;
+  color: #00b432;
+}
+
+.panel {
+  box-sizing: border-box;
+  max-width: 500px;
+  background: #ffffff;
+  box-shadow: 0px 0px 59px 1px rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  margin: 0 auto;
+  color: #014bbc;
+  font-size: 16px;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 27px;
+  text-align: left;
+  padding: 30px;
+  position: relative;
+  margin-bottom: 30px;
+}
+.panel pre {
+  color: #014bbc;
+  font-size: 16px;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 27px;
+}
+.panel.large {
+  max-width: 710px;
+}
+.panel .iconBottom {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+}
+.panel .iconTop {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+@media only screen and (max-width: 600px) {
+  .panel .iconBottom,
+  .panel .iconTop {
+    display: none;
+  }
+}
+
+footer p {
+  padding: 0;
+  margin: 0;
+  font-weight: 500;
+}
+footer p.small {
+  font-size: 14px;
+}
+h2.secondaryTitle {
+  font-size: 22px;
+  margin-bottom: 40px;
+  font-weight: 500;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 0;
+}
+tr th {
+  padding: 12px 0;
+  border-bottom: 2px solid rgba(1, 75, 188, 0.5);
+  font-size: 20px;
+}
+tr th:last-child,
+tr td:last-child {
+  text-align: right;
+  width: 200px;
+}
+tr td {
+  padding: 12px 0;
+  border-bottom: 2px solid rgba(1, 75, 188, 0.15);
+}
+tr td.bold {
+  font-weight: 700;
+}
