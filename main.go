@@ -115,6 +115,22 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 			return
 		}
 
+		// We want to display the count of printed certificates.
+		result, err := cmclient.CertmanagerV1().Certificates(*namespace).List(r.Context(), metav1.ListOptions{})
+		if err != nil {
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Refresh: 5, Error: "Issue with getting the number of certificate already printed. Retrying in 5 seconds."})
+			log.Printf("GET /: while listing the certificates that have Printed=True: %v", err)
+			return
+		}
+
+		var printed int
+		for _, c := range result.Items {
+			if isAlreadyPrinted(&c) {
+				printed++
+			}
+		}
+
 		if r.Method != "GET" {
 			http.Error(w, fmt.Sprintf("The method %s is not allowed on %s", r.Method, r.URL.Path), http.StatusMethodNotAllowed)
 			return
@@ -127,21 +143,21 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		// provided yet.
 		if personName == "" && email == "" {
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, Message: "Welcome! To get your certificate, fill in your name and email."})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Message: "Welcome! To get your certificate, fill in your name and email."})
 			return
 		}
 
 		// Let's check that both the email and name have been entered.
 		if personName == "" && email != "" || personName != "" && email == "" {
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, Message: "Please fill in both the email and name."})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Message: "Please fill in both the email and name."})
 			log.Printf("GET /: the user has given an empty name %q or an empty email %q", personName, email)
 			return
 		}
 
 		if !valid(email) {
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, Error: "The email is invalid."})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Error: "The email is invalid."})
 			log.Printf("GET /: the user %q has given an invalid email %q", personName, email)
 			return
 		}
@@ -154,7 +170,7 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		if len(commonName) > 64 {
 			msg := fmt.Sprintf("Oops, the common name formed using your name and email (%s) counts as %d bytes which goes beyond the common name limit of 64 bytes. Could you try abbreviating some part of your name and try again?", commonName, len(commonName))
 			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, Error: msg})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Error: msg})
 			log.Printf("GET /: the user %q has given a common name %q that is above the 64 bytes limit", personName, commonName)
 			return
 		}
@@ -164,46 +180,40 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 		// expect any clashes since this project is meant to be used
 		// just for the duration of KubeCon EU 2022.
 		certName := emailToCertName(email)
-		_, err := cmclient.CertmanagerV1().Certificates(*namespace).Get(r.Context(), certName, metav1.GetOptions{})
-		switch {
-		case k8serrors.IsNotFound(err):
-			// Create the Certificate.
-			_, err = cmclient.CertmanagerV1().Certificates(*namespace).Create(r.Context(), &certmanagerv1.Certificate{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: certName,
-				},
-				Spec: certmanagerv1.CertificateSpec{
-					CommonName: commonName,
-					Duration:   &metav1.Duration{Duration: 3 * 3650 * 24 * time.Hour}, // 30 years.
-					SecretName: certName,
-					IssuerRef: cmmetav1.ObjectReference{
-						Name:  *issuer,
-						Kind:  *issuerKind,
-						Group: *issuerGroup,
-					},
-				},
-			}, metav1.CreateOptions{})
-			if err != nil {
-				w.WriteHeader(500)
-				tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, Refresh: 5, Error: "There was an error creating your certificate. The page will be reloaded every 5 seconds until this issue is resolved."})
-				log.Printf("GET /: issue while creating the Certificate named %s in namespace %s for '%s <%s>' in Kubernetes: %v", certName, *namespace, personName, email, err)
-				return
-			}
 
-			w.WriteHeader(201)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{})
-			log.Printf("GET /: successfully created a certificate named %s in namespace %s for '%s <%s>' in Kubernetes", certName, *namespace, personName, email)
+		_, err = cmclient.CertmanagerV1().Certificates(*namespace).Create(r.Context(), &certmanagerv1.Certificate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: certName,
+			},
+			Spec: certmanagerv1.CertificateSpec{
+				CommonName: commonName,
+				Duration:   &metav1.Duration{Duration: 3 * 3650 * 24 * time.Hour}, // 30 years.
+				SecretName: certName,
+				IssuerRef: cmmetav1.ObjectReference{
+					Name:  *issuer,
+					Kind:  *issuerKind,
+					Group: *issuerGroup,
+				},
+			},
+		}, metav1.CreateOptions{})
+
+		switch {
+		case k8serrors.IsAlreadyExists(err):
+			w.WriteHeader(409)
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Error: "This email has already been used for creating a certificates."})
+			log.Printf("GET /: cannot create due to duplicate certificate name %s", certName)
 			return
 		case err != nil:
 			w.WriteHeader(500)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, Refresh: 5, Error: "Failed getting the Certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved."})
-			log.Printf("GET /: while getting the Certificate %s in namespace %s in Kubernetes: %v", certName, *namespace, err)
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, Refresh: 5, Error: "There was an error creating your certificate. The page will be reloaded every 5 seconds until this issue is resolved."})
+			log.Printf("GET /: issue while creating the Certificate named %s in namespace %s for '%s <%s>' in Kubernetes: %v", certName, *namespace, personName, email, err)
 			return
 		}
 
 		// We don't display the certificate on this page. Instead, we do that in
 		// the endpoint /certificate?email=...
-		log.Printf("GET /: redirecting to /certificate?certName=%s", certName)
+		w.WriteHeader(201)
+		log.Printf("GET /: successfully created a certificate, redirecting to /certificate?certName=%s", certName)
 		http.Redirect(w, r, "/certificate?certName="+certName, http.StatusFound)
 	}
 }
@@ -546,6 +556,7 @@ type landingPageData struct {
 	MarkedToBePrinted bool                     // Optional.
 	Debug             string                   // Optional.
 	Refresh           int                      // Optional. In seconds.
+	CountPrinted      int
 }
 
 type printPageData struct {
