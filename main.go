@@ -212,7 +212,6 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 
 		// We don't display the certificate on this page. Instead, we do that in
 		// the endpoint /certificate?email=...
-		w.WriteHeader(201)
 		log.Printf("GET /: successfully created a certificate, redirecting to /certificate?certName=%s", certName)
 		http.Redirect(w, r, "/certificate?certName="+certName, http.StatusFound)
 	}
