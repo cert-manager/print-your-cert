@@ -19,6 +19,7 @@
       <br />
       <img src="static/images/logo.svg" alt="Logo" />
       <h1 class="mainTitle">Print Your Certificate</h1>
+      <p>{{.CountPrinted}} certificates have already been printed.</p>
       <div class="divider"></div>
 
       <form method="GET" action="/" class="form">
@@ -29,7 +30,7 @@
         <input
           name="name"
           type="text"
-          value=""
+          value="{{.Name}}"
           required
           placeholder="Your name"
         />
@@ -37,7 +38,7 @@
           <input
             name="email"
             type="text"
-            value=""
+            value="{{.Email}}"
             required
             placeholder="Your email address"
           />
@@ -48,8 +49,6 @@
         <button type="submit">Get your certificate</button>
       </form>
       <div class="push"></div>
-
-      <p>{{.CountPrinted}} certificates have already been printed.</p>
     </div>
     <footer>
       <p>
