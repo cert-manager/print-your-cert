@@ -27,15 +27,17 @@
               <thead class="header">
                   <tr>
                       <th>#</th>
-                      <th>Common name</th>
+                      <th>Name</th>
+                      <th>Date</th>
                       <th>State</th>
                   </tr>
               </thead>
               <tbody>
                 {{range .Certificates}}
                 <tr>
-                  <td class="bold">1.</td>
+                    <td class="bold">1.</td>
                     <td class="bold">{{.CommonName}}</td>
+                    <td>{{.NotBefore}}</td>
                     <td>{{.State}}</td>
                 </tr>
                 {{end}}

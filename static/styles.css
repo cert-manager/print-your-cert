@@ -39,6 +39,7 @@ h2 {
   color: #ffffff;
   max-width: 500px;
   margin: 20px auto;
+  word-wrap: break-word;
 }
 
 p {
@@ -60,6 +61,11 @@ p {
   width: 300px;
   border: 1px solid rgba(255, 255, 255, 0.5);
   margin: 10px 0 40px 0;
+}
+@media only screen and (max-width: 500px) {
+  .divider {
+    width: 100%;
+  }
 }
 
 .form {
@@ -128,6 +134,8 @@ button:hover {
   line-height: 24px;
   text-align: center;
   color: #ff0000;
+  max-width: 600px;
+  margin: -10px auto 0 auto;
 }
 .success {
   padding: 10px;
@@ -153,6 +161,7 @@ button:hover {
   padding: 30px;
   position: relative;
   margin-bottom: 30px;
+  overflow: auto;
 }
 .panel pre {
   color: #014bbc;
@@ -210,7 +219,7 @@ table {
   border: 0;
 }
 tr th {
-  padding: 12px 0;
+  padding: 12px 10px;
   border-bottom: 2px solid rgba(1, 75, 188, 0.5);
   font-size: 20px;
 }
@@ -220,7 +229,7 @@ tr td:last-child {
   width: 200px;
 }
 tr td {
-  padding: 12px 0;
+  padding: 12px 10px;
   border-bottom: 2px solid rgba(1, 75, 188, 0.15);
 }
 tr td.bold {
