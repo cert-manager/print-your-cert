@@ -38,14 +38,12 @@
         {{end}}
         <div>
           <form method="POST" action="/print">
-            <input name="name" type="text" value="{{.Name}}" hidden />
-            <input name="email" type="text" value="{{.Email}}" hidden />
+            <input name="certName" type="text" value="{{.CertName}}" hidden />
             <button type="submit" class="constrain">Send to print</button>
           </form>
           <br />
           <form method="GET" action="/download">
-            <input name="email" type="text" value="{{.Email}}" hidden />
-
+            <input name="certName" type="text" value="{{.CertName}}" hidden />
             <p style="color: darkgreen"></p>
             <button type="submit" class="constrain">
               Download in PEM format
