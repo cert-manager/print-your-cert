@@ -125,7 +125,7 @@ For example:
 > It takes three steps to turn this PEM-encoded certificate into something that
 > can be given with the query parameter `?asn1=...`.
 >
-> 1. We remove the header and footer, i.e., we remove the lines `-----BEGIN
+> 1. We remove the header and footer, i.e., we remove the lines `----c-BEGIN
 >    CERTIFICATE-----` and `-----END CERTIFICATE-----`). The result looks like
 >    this:
 >
