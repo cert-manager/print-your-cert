@@ -15,7 +15,7 @@ jobs:
 
       - run: |
           mkdir public
-          cp gh-pages-*.html public/
+          cp index.html public/
           cp -r static/ public/
 
       # The GITHUB_TOKEN already given for running github actions is not
