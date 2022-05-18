@@ -554,6 +554,8 @@ func isReady(cert *certmanagerv1.Certificate) bool {
 
 func emailToCertName(email string) string {
 	certName := strings.ReplaceAll(email, "@", "-")
+	certName = strings.ReplaceAll(certName, "_", "-")
+	certName = strings.ToLower(certName)
 	return certName
 }
 
