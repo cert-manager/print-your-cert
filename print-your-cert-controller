@@ -56,7 +56,7 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
             continue
         fi
 
-        if ! out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 --rotate 90 front.png 2>&1); then
+        if ! out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 front.png 2>&1); then
             printf "%s: failed to print front.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
             if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
                 -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
