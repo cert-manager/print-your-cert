@@ -19,14 +19,15 @@
       <br />
       <img src="static/images/logo.svg" alt="Logo" width="220" height="191" />
       <h1 class="mainTitle">Print Your Certificate</h1>
-      <p>
-        {{.CountPrinted}} certificates have already been printed, and
-        {{.CountPending}} and waiting to be printed. See
-        <a href="/list">the list</a>.
-      </p>
+
       <div class="divider"></div>
 
       <form method="GET" action="/" class="form">
+        <p>
+          <strong>{{.CountPrinted}}</strong> certificates have already been
+          printed, and <strong>{{.CountPending}}</strong> and waiting to be
+          printed. See <a href="/list">the list</a>.
+        </p>
         <p>
           Fill in your details and create your very own certificate which will
           get printed for you to take home.

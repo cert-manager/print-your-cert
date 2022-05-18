@@ -74,6 +74,9 @@ p {
   max-width: 430px;
   margin: 0 auto;
 }
+form p {
+  margin: 0;
+}
 
 .form input {
   width: 100%;
