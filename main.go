@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/mail"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -488,11 +489,20 @@ func listPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 			return
 		}
 
+		// We want the newest certificates first.
+		sort.Slice(certs.Items, func(i, j int) bool {
+			return certs.Items[i].CreationTimestamp.Time.After(certs.Items[j].CreationTimestamp.Time)
+		})
+
 		var certsOut []certificateItem
+		var position int
 		for _, cert := range certs.Items {
+			position++
 			certsOut = append(certsOut, certificateItem{
 				CommonName: cert.Spec.CommonName,
 				State:      stateOfCert(cert),
+				Date:       cert.Status.NotBefore.Time,
+				Position:   position,
 			})
 		}
 
@@ -585,6 +595,8 @@ type listPageData struct {
 type certificateItem struct {
 	CommonName string
 	State      StateCert
+	Date       time.Time
+	Position   int
 }
 
 type certificateTemplateData struct {

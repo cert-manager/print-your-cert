@@ -26,32 +26,30 @@
       </p>
 
       <div class="divider"></div>
-      <h2 class="secondaryTitle">Last certificates that were printed</h1>
-        <div class="panel large">
-          <div class="content">
-            <table>
-              <thead class="header">
-                  <tr>
-                      <th>#</th>
-                      <th>Name</th>
-                      <th>Date</th>
-                      <th>State</th>
-                  </tr>
-              </thead>
-              <tbody>
-                {{range .Certificates}}
-                <tr>
-                    <td class="bold">1.</td>
-                    <td class="bold">{{.CommonName}}</td>
-                    <td>{{.NotBefore}}</td>
-                    <td>{{.State}}</td>
-                </tr>
-                {{end}}
-              </tbody>
-              </table>
-          </div>
-
+      <div class="panel large">
+        <div class="content">
+          <table>
+            <thead class="header">
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Date</th>
+                <th>State</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{range .Certificates}}
+              <tr>
+                <td class="bold">{{.Position}}</td>
+                <td class="bold">{{.CommonName}}</td>
+                <td>{{.Date}}</td>
+                <td>{{.State}}</td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
         </div>
+      </div>
       <div class="push"></div>
     </div>
     <footer>
