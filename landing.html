@@ -25,8 +25,8 @@
       <form method="GET" action="/" class="form">
         <p>
           <strong>{{.CountPrinted}}</strong> certificates have already been
-          printed, and <strong>{{.CountPending}}</strong> and waiting to be
-          printed. See <a href="/list">the list</a>.
+          printed, and <strong>{{.CountPending}}</strong> waiting to be printed.
+          See <a href="/list">the list</a>.
         </p>
         <p>
           Fill in your details and create your very own certificate which will
@@ -59,9 +59,14 @@
         <button type="submit">Get your certificate</button>
       </form>
 
-      <div class="divider"></div>
-
-      <p style="font-size: 10px; color: white">
+      <p
+        style="
+          font-size: 10px;
+          color: white;
+          max-width: 500px;
+          margin: 20px auto;
+        "
+      >
         The email will not be displayed on the screen, just your name. The name
         and email are used to fill in the "Subject" field of the X.509
         certificate, and won't be used for anything else than printing the
