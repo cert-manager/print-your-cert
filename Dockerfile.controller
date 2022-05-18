@@ -12,7 +12,7 @@ RUN echo "@testing http://dl-cdn.alpinelinux.org/alpine/edge/testing" | tee -a /
     && printf '#!/bin/sh\ncd /root/brother_ql_web-master && exec python3 ./brother_ql_web.py "$@"\n' >/usr/local/bin/brother_ql_web \
     && chmod +x /usr/local/bin/brother_ql_web
 
-COPY config.json *.svg /root/
+COPY config.json *.png /root/
 COPY pem-to-png print-your-cert-controller kubectl-curl /usr/local/bin/
 
 EXPOSE 8013
