@@ -1,0 +1,25 @@
+#! /bin/bash
+
+set -uexo pipefail
+
+deploy() {
+    docker buildx build -f Dockerfile.controller --platform linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-controller:latest -o type=docker .
+    docker rm -f print-your-cert-controller
+    docker run -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb -v $HOME/.kube/config:/root/.kube/config --net=host ghcr.io/maelvls/print-your-cert-controller:latest
+
+    GOARCH=arm64 CGO_ENABLED=0 go build -o print-your-cert-ui-arm64 .
+    docker buildx build -f Dockerfile.ui --platform linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-ui:latest -o type=docker .
+    docker rm -f print-your-cert-ui
+    docker run -d --restart=always --name print-your-cert-ui --net=host -v $HOME/.kube/config:/root/.kube/config ghcr.io/maelvls/print-your-cert-ui:latest --issuer ca-issuer --issuer-kind ClusterIssuer --listen 0.0.0.0:8080
+}
+deploy
+while true; do
+    sleep 10s
+    git remote update
+    if git merge-base --is-ancestor origin/main main; then
+        echo No new commit, skipping
+        continue
+    fi
+    git pull
+    deploy
+done
