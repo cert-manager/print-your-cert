@@ -87,7 +87,7 @@ convert -size 696x492 canvas:white \
 
 # See js/x509.js to understand the format expected by the asn1 query parameter.
 url=$(grep -v 'CERTIFICATE' /tmp/crt | tr -d '$\n' | python3 -c "import urllib.parse; print(urllib.parse.quote_plus(open(0).read()))")
-echo "https://maelvls.dev/print-your-cert?asn1=$url" | qrencode --type PNG --margin 0 -o - | convert -size 696x492 canvas:white \
+echo "https://cert-manager.github.io/print-your-cert?asn1=$url" | qrencode --type PNG --margin 0 -o - | convert -size 696x492 canvas:white \
     \( -gravity Center -monochrome -filter point -interpolate nearest - -resize 492 \) -composite back.png
 
 # Example:
