@@ -17,7 +17,7 @@
   <body>
     <div class="wrapper">
       <br />
-      <img src="static/images/logo.svg" alt="Logo" />
+      <img src="static/images/logo.svg" alt="Logo" width="220" height="191" />
       <h1 class="mainTitle">Print Your Certificate</h1>
       <p>
         {{.CountPrinted}} certificates have already been printed, and
@@ -28,8 +28,8 @@
 
       <form method="GET" action="/" class="form">
         <p>
-          Fill in your details and create your very own certificate which it
-          will printed to take home.
+          Fill in your details and create your very own certificate which will
+          get printed for you to take home.
         </p>
         <input
           name="name"
@@ -57,6 +57,17 @@
         </div>
         <button type="submit">Get your certificate</button>
       </form>
+
+      <div class="divider"></div>
+
+      <p style="font-size: 10px; color: white">
+        The email will not be displayed on the screen, just your name. The name
+        and email are used to fill in the "Subject" field of the X.509
+        certificate, and won't be used for anything else than printing the
+        certificate. The data submitted stays on the Pi, and will be removed
+        after the 21 May 2022 (the printed QR code will still work).
+      </p>
+
       <div class="push"></div>
     </div>
     <footer>
