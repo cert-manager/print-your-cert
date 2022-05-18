@@ -9,6 +9,7 @@ import (
 	"embed"
 	_ "embed"
 	"encoding/pem"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -338,6 +339,19 @@ func downloadPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) 
 
 var nameAndEmailRe = regexp.MustCompile(`^(.*) <(.*)>$`)
 
+func parseNameAndEmail(nameAndEmail string) (name, email string, _ error) {
+	if nameAndEmail == "" {
+		return "", "", errors.New("empty name and email")
+	}
+
+	parts := nameAndEmailRe.FindStringSubmatch(nameAndEmail)
+	if len(parts) != 3 || parts[1] == "" || parts[2] == "" {
+		return "", "", fmt.Errorf("the name-and-email string '%s' does not follow the format 'John Doe <john@doe.co>', the regex '%v' parsed this: %v", emailToCertName, nameAndEmailRe.String(), strings.Join(parts, ", "))
+	}
+
+	return parts[1], parts[2], nil
+}
+
 // After the user clicks "Get your certificate" on the landing page, and if the
 // certificate was successfully created, the user is redirected to /certificate
 // to "visualize" their certificate and to print it. This page is similar to the
@@ -392,15 +406,13 @@ func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interfac
 
 		// Parse the email and personName out of the common personName. The common personName is
 		// of the form 'John Doe <john@doe.io>'.
-		parts := nameAndEmailRe.FindStringSubmatch(cert.Spec.CommonName)
-		if len(parts) != 3 || parts[1] == "" || parts[2] == "" {
+		personName, email, err := parseNameAndEmail(cert.Spec.CommonName)
+		if err != nil {
 			w.WriteHeader(500)
 			tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Error: "The is an issue with the certificate's common name. Please let know the cert-manager booth staff.", Debug: debugMsg})
-			log.Printf("GET /certificate: the common name '%s' in the certificate %s does not follow the format 'John Doe <john@doe.co>', the regex '%v' parsed this: %v", cert.Spec.CommonName, certName, nameAndEmailRe.String(), strings.Join(parts, ", "))
+			log.Printf("GET /certificate: certificate %s: %v", certName, err)
 			return
 		}
-		personName := parts[1]
-		email := parts[2]
 
 		// Success: we found the Certificate in Kubernetes. Let us see
 		// if it is ready.
@@ -498,11 +510,17 @@ func listPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 		var position int
 		for _, cert := range certs.Items {
 			position++
+			personName, email, err := parseNameAndEmail(cert.Spec.CommonName)
+			if err != nil {
+				log.Printf("GET /list: while listing certificates, the certificate %s was skipped: %v", cert.Name, err)
+				continue
+			}
 			certsOut = append(certsOut, certificateItem{
-				CommonName: cert.Spec.CommonName,
-				State:      stateOfCert(cert),
-				Date:       cert.Status.NotBefore.Time,
-				Position:   position,
+				Name:     personName,
+				Email:    email,
+				State:    stateOfCert(cert),
+				Date:     cert.Status.NotBefore.Time,
+				Position: position,
 			})
 		}
 
@@ -593,10 +611,11 @@ type listPageData struct {
 }
 
 type certificateItem struct {
-	CommonName string
-	State      StateCert
-	Date       time.Time
-	Position   int
+	Position int
+	Name     string
+	Email    string
+	Date     time.Time
+	State    StateCert
 }
 
 type certificateTemplateData struct {
