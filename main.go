@@ -506,21 +506,19 @@ func listPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 			return certs.Items[i].CreationTimestamp.Time.After(certs.Items[j].CreationTimestamp.Time)
 		})
 
-		var certsOut []certificateItem
-		var position int
+		var certsOut []certificateItemVn'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''eehbbhhhbb@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@◊cvv
+		<
 		for _, cert := range certs.Items {
-			position++
 			personName, email, err := parseNameAndEmail(cert.Spec.CommonName)
 			if err != nil {
 				log.Printf("GET /list: while listing certificates, the certificate %s was skipped: %v", cert.Name, err)
 				continue
 			}
 			certsOut = append(certsOut, certificateItem{
-				Name:     personName,
-				Email:    email,
-				State:    stateOfCert(cert),
-				Date:     cert.Status.NotBefore.Time,
-				Position: position,
+				Name:  personName,
+				Email: email,
+				State: stateOfCert(cert),
+				Date:  cert.Status.NotBefore.Time,
 			})
 		}
 
