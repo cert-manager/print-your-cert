@@ -78,8 +78,8 @@ EOF
 )
 
 # \( -gravity NorthEast logo.png -resize 160 -background white -alpha remove -alpha off -monochrome \) -geometry +40+20 -composite \
+# \( -gravity East kubecon-eu-2022-logo.png -resize 280 -background white -alpha remove -alpha off -monochrome \) -geometry +80+10 \
 convert -size 696x492 canvas:white \
-    \( -gravity East kubecon-eu-2022-logo.png -resize 280 -background white -alpha remove -alpha off -monochrome \) -geometry +80+60 \
     \( -gravity NorthWest -font Open-Sans-Regular -pointsize 22 -fill black -annotate +0-0 "$line1" \) -geometry +0+0 \
     \( -gravity NorthWest -font Open-Sans-Regular -pointsize 22 -fill black -annotate +0+115 "$line2" \) -geometry +0+0 \
     \( -gravity SouthWest -font DejaVu-Sans-Mono -pointsize 22 -fill black -annotate +0+0 "$(step certificate inspect --short /tmp/crt | sed -e 's/\[\(.*\)\]/\n\1/' -e 's/Certificate (\(.*\))/Certificate\nAlgorithm: \1/' | sed 's/^  //')" \) -geometry +0+0 \
