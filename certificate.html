@@ -20,9 +20,9 @@
       <h1 class="mainTitle">Print Your Certificate</h1>
       <div class="divider"></div>
       <div>
-        <h2>Hi, {{.Name}} <{{.Email}}>!</h2>
-        <p>Here is your certificate:</p>
         {{if .Certificate}}
+        <h2>Hi, {{.Certificate.Name}} <{.Certificate.Email}}>!</h2>
+        <p>Here is your certificate:</p>
         <div class="panel">
           <div class="content">{{template "certificate" .Certificate}}</div>
           <img
@@ -35,6 +35,8 @@
         <div class="success">The certificate has already been printed.</div>
         {{end}} {{if .MarkedToBePrinted}}
         <div class="success">The certificate is waiting to be printed.</div>
+        {{end}} {{if .Message}}
+        <div class="success">{{.Message}}</div>
         {{end}}
         <div>
           <form method="POST" action="/print">

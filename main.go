@@ -418,7 +418,7 @@ func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interfac
 		// if it is ready.
 		if !isReady(cert) {
 			w.WriteHeader(423)
-			tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, Refresh: 5, Message: "Your certificate is not ready yet. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
+			tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, CanPrint: false, MarkedToBePrinted: false, AlreadyPrinted: false, Refresh: 5, Message: "Your certificate will appear shortly. The page will reload automatically in 5 seconds.", Debug: debugMsg})
 			log.Printf("GET /certificate: the requested certificate %s in namespace %s is not ready yet.", certName, *namespace)
 			return
 		}
