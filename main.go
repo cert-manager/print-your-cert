@@ -346,7 +346,7 @@ func parseNameAndEmail(nameAndEmail string) (name, email string, _ error) {
 
 	parts := nameAndEmailRe.FindStringSubmatch(nameAndEmail)
 	if len(parts) != 3 || parts[1] == "" || parts[2] == "" {
-		return "", "", fmt.Errorf("the name-and-email string '%s' does not follow the format 'John Doe <john@doe.co>', the regex '%v' parsed this: %v", emailToCertName, nameAndEmailRe.String(), strings.Join(parts, ", "))
+		return "", "", fmt.Errorf("the name-and-email string '%s' does not follow the format 'John Doe <john@doe.co>', the regex '%v' parsed this: %v", emailToCertName(email), nameAndEmailRe.String(), strings.Join(parts, ", "))
 	}
 
 	return parts[1], parts[2], nil
@@ -555,6 +555,7 @@ func isReady(cert *certmanagerv1.Certificate) bool {
 func emailToCertName(email string) string {
 	certName := strings.ReplaceAll(email, "@", "-")
 	certName = strings.ReplaceAll(certName, "_", "-")
+	certName = strings.ReplaceAll(certName, " ", "")
 	certName = strings.ToLower(certName)
 	return certName
 }
