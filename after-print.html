@@ -9,6 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="static/styles.css" />
+    <meta http-equiv="refresh" content="2;URL=/certificate?certName={{.CertName}}">
   </head>
 
   <body>
@@ -17,11 +18,14 @@
       <h1>Printing your certificate</h1>
     <div>
       {{if .Error}}
-      <p style="color: #800000">{{.Error}}</p>
-      {{else}}
-      <p style="color: seagreen">Your certificate should now get printed!</p>
+      <div class="error">{{.Error}}</div>
+      {{end}}
+      {{if .CertName}}
+      <div class="success">
+      <p style="color: seagreen">Your certificate should now get printed! Redirecting to your certificate in 2 seconds...</p>
+      </div>
       <form method="GET" action="/certificate" class="form">
-        <input name="name" type="text" value="{{.CertName}}" hidden required />
+        <input name="certName" type="text" value="{{.CertName}}" hidden required />
         <input type="submit" value="Back to your certificate" class="constrain" />
       </form>
       {{end}}

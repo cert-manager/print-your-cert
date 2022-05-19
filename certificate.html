@@ -20,8 +20,8 @@
       <h1 class="mainTitle">Print Your Certificate</h1>
       <div class="divider"></div>
       <div>
-        {{if .Certificate}}
-        <h2>Hi, {{.Certificate.Name}} <{.Certificate.Email}}>!</h2>
+        {{if .Certificate.Subject}}
+        <h2>Hi, {{.Name}} <{{.Email}}>!</h2>
         <p>Here is your certificate:</p>
         <div class="panel">
           <div class="content">{{template "certificate" .Certificate}}</div>
@@ -36,13 +36,19 @@
         {{end}} {{if .MarkedToBePrinted}}
         <div class="success">The certificate is waiting to be printed.</div>
         {{end}} {{if .Message}}
-        <div class="success">{{.Message}}</div>
-        {{end}}
+        <div class="error">{{.Message}}</div>
+        {{end}} {{if .Error}}
+        <div class="error">
+          <p>{{.Error}}</p>
+        </div>
+        {{end}} {{if .Certificate.Subject}}
         <div>
+          {{if not .AlreadyPrinted}}
           <form method="POST" action="/print">
             <input name="certName" type="text" value="{{.CertName}}" hidden />
             <button type="submit" class="constrain">Send to print</button>
           </form>
+          {{end}}
           <br />
           <form method="GET" action="/download">
             <input name="certName" type="text" value="{{.CertName}}" hidden />
@@ -52,10 +58,19 @@
             </button>
           </form>
         </div>
+        {{end}}
+      </div class="divider"></div>
+      <div>
+        <a href="/">
+          <button type="submit" class="constrain">Go back to the creation page</button>
+        </a>
       </div>
-
       <div class="push"></div>
     </div>
+    {{if .Debug}}
+    </div class="divider"></div>
+    <pre>{{.Debug}}</pre>
+    {{end}}
     <footer>
       <p>
         Powered by
@@ -72,8 +87,5 @@
         >
       </p>
     </footer>
-    {{if .Debug}}
-    <pre>{{.Debug}}</pre>
-    {{end}}
   </body>
 </html>
