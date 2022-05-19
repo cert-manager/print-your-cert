@@ -31,6 +31,8 @@
             class="iconBottom"
           />
         </div>
+        {{else}}
+        <div class="success">The certificate is will appear shortly, this page will reload itself.</div>
         {{end}} {{if .AlreadyPrinted}}
         <div class="success">The certificate has already been printed.</div>
         {{end}} {{if .MarkedToBePrinted}}
@@ -60,12 +62,12 @@
         </div>
         {{end}}
       </div class="divider"></div>
+      <div class="push"></div>
       <div>
         <a href="/">
           <button type="submit" class="constrain">Go back to the creation page</button>
         </a>
       </div>
-      <div class="push"></div>
     </div>
     {{if .Debug}}
     </div class="divider"></div>
