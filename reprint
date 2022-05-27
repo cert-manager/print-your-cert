@@ -1,0 +1,27 @@
+#! /bin/bash
+
+#
+help() {
+	cat <<EOF
+We have seen cases where we needed to manually re-trigger the printing of the
+labels. Since re-printing requires removing the Printed=True condition, we
+have to use curl since kubectl doesnt support updating the status
+subresource.
+
+This command uses the namespace "default", and currently doesn't support
+changing to a different namespace.
+
+Usage:
+  $(basename "$0") <cert-name>
+
+EOF
+
+set -euo pipefail
+
+if ! [ $# -eq 1 ]; then
+	printf "error: you need to give the name of a certificate as argument.\n" >&2
+fi
+name=$1
+
+./kubectl-curl --fail -sS -k -d '[{ "op": "replace", "path":"/status/conditions", "value": [] }]' -H "Content-Type: application/json-patch+json" -X PATCH "http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/$name/status" | jq
+
