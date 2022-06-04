@@ -568,7 +568,7 @@ available in Spain).
 https://print-your-cert.cert-manager.xyz
               |
               |
-              v  34.175.62.123 (eth0)
+              v  34.77.191.67 (eth0)
     +------------------+
     |  VM "wireguard"  |
     |                  |
@@ -599,12 +599,12 @@ gcloud compute firewall-rules create allow-tailscale \
 gcloud compute instances create wireguard \
     --project jetstack-mael-valais \
     --network default \
-    --machine-type=e2-micro \
+    --machine-type=f1-micro \
     --image-family=debian-11 \
     --image-project=debian-cloud \
     --can-ip-forward \
     --boot-disk-size=10GB \
-    --zone=europe-southwest1-c
+    --zone=europe-west1-b
 ```
 
 Then, I copy-pasted the IP into the mael.pw zone:
@@ -614,7 +614,7 @@ Then, I copy-pasted the IP into the mael.pw zone:
    ```sh
    gcloud compute instances describe wireguard \
        --project jetstack-mael-valais \
-       --zone=europe-southwest1-c --format json \
+       --zone=europe-west1-b --format json \
          | jq -r '.networkInterfaces[].accessConfigs[] | select(.type=="ONE_TO_ONE_NAT") | .natIP'
    ```
 
@@ -622,14 +622,14 @@ Then, I copy-pasted the IP into the mael.pw zone:
    record:
 
    ```text
-   print-your-cert.cert-manager.xyz.     300     IN      A      34.175.254.25
+   print-your-cert.cert-manager.xyz.     300     IN      A      34.77.191.67
    ```
 
 Then, I installed Tailscale and made sure IP forwarding is enabled on the VM:
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- 'curl -fsSL https://tailscale.com/install.sh | sh'
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- \
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguard -- 'curl -fsSL https://tailscale.com/install.sh | sh'
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguard -- \
     "sudo perl -ni -e 'print if \!/^net.ipv4.ip_forward=1/d' /etc/sysctl.conf; \
      sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1; \
      sudo sysctl -w net.ipv4.ip_forward=1"
@@ -639,7 +639,7 @@ Finally, I installed Caddy as a systemd unit by following [their
 guide](https://caddyserver.com/docs/install#debian-ubuntu-raspbian):
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- bash <<'EOF'
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguard -- bash <<'EOF'
 sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo tee /etc/apt/trusted.gpg.d/caddy-stable.asc
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
@@ -649,7 +649,7 @@ EOF
 ```
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-southwest1-c wireguard -- bash <<'EOF'
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguard -- bash <<'EOF'
 sudo tee /etc/caddy/Caddyfile <<CADDY
 print-your-cert.cert-manager.xyz:443 {
         reverse_proxy $(tailscale ip -4 pi):8080
