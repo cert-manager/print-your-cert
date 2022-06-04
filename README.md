@@ -635,6 +635,12 @@ gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguar
      sudo sysctl -w net.ipv4.ip_forward=1"
 ```
 
+I logged in to Tailscale using my tailnet (maelvls@github):
+
+```sh
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguard -- sudo tailscale up
+```
+
 Finally, I installed Caddy as a systemd unit by following [their
 guide](https://caddyserver.com/docs/install#debian-ubuntu-raspbian):
 
