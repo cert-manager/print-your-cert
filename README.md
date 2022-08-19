@@ -1,8 +1,12 @@
 # The "Print you certificate!" experiment at the cert-manager booth (KubeCon EU 2022 in Valencia)
 
+⚠️ The URLs an IPs presented in this README are guarenteed to work from 18 to
+20 May 2022, but may stop working afterwards.
+
 <img alt="Photo of the cert-manager booth when we were running the Print your certificate experiment. A participant can be seen typing their name and email on the keyboard." src="https://user-images.githubusercontent.com/2195781/170957591-0cfcfb4d-05d8-41ad-bfa6-f6162e36479f.jpeg" width="300"/> <img alt="Liz Rice met with the cert-manager maintainers Charlie Egan, Josh van Leeuwen, and Jake Sanders with the cert-manager booth in the background. All credits for this image go to Liz Rice who shared this picture on Twitter at https://twitter.com/lizrice/status/1527585297743110145." src="https://user-images.githubusercontent.com/2195781/170959280-f78822a4-1ba8-416c-91dc-5e7dbc5da24b.png" width="300"/> <img alt="Dovy came to the cert-manager booth and took a picture of the card on which a stamp of the cert-manager project is visible, as well as the label showing their X.509 certificate. All credits for this photo go to Dovy who shared this picture on Twitter at https://twitter.com/ddovys/status/1526890240568344576." src="https://user-images.githubusercontent.com/2195781/170959287-125e5fab-52ab-43f5-8781-94af0d3cbb83.png" width="300"/>
 
-- [What is this experiment?](#what-is-this-experiment)
+- [Video and slides of the experiment](#video-and-slides-of-the-experiment)
+- [Description of the experiment](#description-of-the-experiment)
 - [What's the stack?](#whats-the-stack)
 - [Staff: test things](#staff-test-things)
 - [Running](#running)
@@ -20,15 +24,18 @@
 - [Testing pem-to-png](#testing-pem-to-png)
 - [Set up the tunnel between the Internet and the Pi](#set-up-the-tunnel-between-the-internet-and-the-pi)
 
-## What is this experiment?
-
-⚠️ The URLs an IPs presented in this README are guarenteed to work from 18 to
-20 May 2022, but may stop working afterwards.
+## Video and slides
 
 Here is a short video showing what the experiment looked like on Friday 20 May 2022
 at KubeCon Valencia:
 
 [![A minute at the cert-manager booth with the "Print your certificate" experiment at KubeCon 2022 in Valencia](https://user-images.githubusercontent.com/2195781/170956255-c7b4b36e-6405-431c-991c-8f1352aaf2a1.jpg)](https://www.youtube.com/watch?v=7Gyt4-yVTN8 "A minute at the cert-manager booth (KubeCon EU 2022 in València)")
+
+Here are the slides Mael presented after KubeCon:
+
+<img width="500" alt="Print your cert, KubeCon 2022 Valencia" src="https://user-images.githubusercontent.com/2195781/185626468-9c3f5857-cc2f-47c4-af0a-0d677fc64533.png"/><img width="500" alt="Print your cert, KubeCon 2022 Valencia (1)" src="https://user-images.githubusercontent.com/2195781/185626527-d94824b6-e68a-4624-8fa0-ade370cb0701.png"/><img width="500" alt="Print your cert, KubeCon 2022 Valencia (2)" src="https://user-images.githubusercontent.com/2195781/185626500-ba19f5e0-0bda-49aa-9972-717f820e509e.png"/><img width="500" alt="Print your cert, KubeCon 2022 Valencia (3)" src="https://user-images.githubusercontent.com/2195781/185626540-b7794961-83ad-4c28-b3e5-7b357d24d7a4.png"/><img width="500" alt="Print your cert, KubeCon 2022 Valencia (4)" src="https://user-images.githubusercontent.com/2195781/185626551-e690ff66-da3d-4fe1-8496-697530c277e8.png"/>
+
+## Description of the experiment
 
 When visiting the cert-manager booth, you will be welcomed and one of the staff
 may suggest to visit a QR code from their phone to participate to the "Print
