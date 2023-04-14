@@ -173,7 +173,7 @@ shown in the browser:
 <img alt="download" src="https://user-images.githubusercontent.com/2195781/168419122-1bf3d0dd-c474-4d47-a55e-56980ed16441.png" width="500"/>
 
 On the booth, we have a 42-inch display showing the list of certificates
-(<https://print-your-cert.cert-manager.xyz/list>):
+(<https://print-your-cert.cert-manager.io/list>):
 
 <img alt="list" src="https://user-images.githubusercontent.com/2195781/168419219-fb3e5eb7-672e-4792-9ac3-40cf8e6b251d.png" width="300"/>
 
@@ -184,7 +184,7 @@ point so that people can verify the signature.
 ## What's the stack?
 
 ```text
-https://print-your-cert.cert-manager.xyz
+https://print-your-cert.cert-manager.io
                 |
                 |
                 v
@@ -220,7 +220,7 @@ things:
 - [Install tailscale](https://tailscale.com/download/).
 - Run `tailscale up`, it should open something in your browser → "Sign in
   with GitHub" → Authorize Tailscale → Multi-user Tailnet cert-manager.
-- If <http://print-your-cert.cert-manager.xyz/> doesn't work, then the frontend UI
+- If <http://print-your-cert.cert-manager.io/> doesn't work, then the frontend UI
   is at <http://100.121.173.5:8080/>.
 - You can test that the printer works at <http://100.121.173.5:8013/>.
 - You can SSH into the Pi (which runs a Kubernetes cluster) as long as
@@ -567,12 +567,12 @@ brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 pem-
 > [public-ip-on-my-machine-using-wireguard](https://hackmd.io/@maelvls/public-ip-on-my-machine-using-wireguard).
 
 I want to expose the print-your-cert-ui on the Internet on
-<https://print-your-cert.cert-manager.xyz>, so I need to set up a TCP tunnel towards the
+<https://print-your-cert.cert-manager.io>, so I need to set up a TCP tunnel towards the
 Pi. I use Tailscale and Caddy on a GCP e2-micro VM (because f1-micro isn't
 available in Spain).
 
 ```text
-https://print-your-cert.cert-manager.xyz
+https://print-your-cert.cert-manager.io
               |
               |
               v  34.77.191.67 (eth0)
@@ -614,22 +614,24 @@ gcloud compute instances create wireguard \
     --zone=europe-west1-b
 ```
 
-Then, I copy-pasted the IP into the mael.pw zone:
+Then, I copy-pasted the IP into the print-your-cert.cert-manager.io zone:
 
 1. Copy the IP:
 
    ```sh
-   gcloud compute instances describe wireguard \
+   IP=$(gcloud compute instances describe wireguard \
        --project jetstack-mael-valais \
        --zone=europe-west1-b --format json \
-         | jq -r '.networkInterfaces[].accessConfigs[] | select(.type=="ONE_TO_ONE_NAT") | .natIP'
+         | jq -r '.networkInterfaces[].accessConfigs[] | select(.type=="ONE_TO_ONE_NAT") | .natIP')
    ```
 
-2. Go to <https://google.domains> (I use their DNS for mael.pw) and add the
-   record:
+2. I delegated `print-your-cert.cert-manager.io`. Anyone in the group
+   team-cert-manager@jetstack.io can update the `A` record:
 
-   ```text
-   print-your-cert.cert-manager.xyz.     300     IN      A      34.77.191.67
+   ```bash
+   gcloud dns record-sets update --project cert-manager-io \
+     --zone print-your-cert-cert-manager-io \
+     --type=A --ttl=300 print-your-cert.cert-manager.io --rrdatas=$IP
    ```
 
 Then, I installed Tailscale and made sure IP forwarding is enabled on the VM:
@@ -664,7 +666,7 @@ EOF
 ```sh
 gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguard -- bash <<'EOF'
 sudo tee /etc/caddy/Caddyfile <<CADDY
-print-your-cert.cert-manager.xyz:443 {
+print-your-cert.cert-manager.io:443 {
         reverse_proxy $(tailscale ip -4 pi):8080
 }
 CADDY
