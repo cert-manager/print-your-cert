@@ -5,24 +5,25 @@
 
 <img alt="Photo of the cert-manager booth when we were running the Print your certificate experiment. A participant can be seen typing their name and email on the keyboard." src="https://user-images.githubusercontent.com/2195781/170957591-0cfcfb4d-05d8-41ad-bfa6-f6162e36479f.jpeg" width="300"/> <img alt="Liz Rice met with the cert-manager maintainers Charlie Egan, Josh van Leeuwen, and Jake Sanders with the cert-manager booth in the background. All credits for this image go to Liz Rice who shared this picture on Twitter at https://twitter.com/lizrice/status/1527585297743110145." src="https://user-images.githubusercontent.com/2195781/170959280-f78822a4-1ba8-416c-91dc-5e7dbc5da24b.png" width="300"/> <img alt="Dovy came to the cert-manager booth and took a picture of the card on which a stamp of the cert-manager project is visible, as well as the label showing their X.509 certificate. All credits for this photo go to Dovy who shared this picture on Twitter at https://twitter.com/ddovys/status/1526890240568344576." src="https://user-images.githubusercontent.com/2195781/170959287-125e5fab-52ab-43f5-8781-94af0d3cbb83.png" width="300"/>
 
-- [Video and slides of the experiment](#video-and-slides-of-the-experiment)
+- [Video and slides](#video-and-slides)
 - [Description of the experiment](#description-of-the-experiment)
 - [What's the stack?](#whats-the-stack)
 - [Staff: test things](#staff-test-things)
-- [Running](#running)
-  - [Build the UI (`ghcr.io/maelvls/print-your-cert-ui:latest`)](#build-the-ui-ghcriomaelvlsprint-your-cert-uilatest)
+- [Running everything on the Raspberry Pi (on the booth)](#running-everything-on-the-raspberry-pi-on-the-booth)
+  - [Booth: Intial set up of the Raspberry Pi](#booth-intial-set-up-of-the-raspberry-pi)
+  - [Booth: Set up the tunnel between the Internet and the Raspberry Pi](#booth-set-up-the-tunnel-between-the-internet-and-the-raspberry-pi)
+  - [Prerequisite: install k3s](#prerequisite-install-k3s)
+  - [Booth: Run the UI on the Raspberry Pi](#booth-run-the-ui-on-the-raspberry-pi)
+  - [Booth: Running the printer controller on the Raspberry Pi](#booth-running-the-printer-controller-on-the-raspberry-pi)
+- [Local development](#local-development)
   - [Local development on the UI](#local-development-on-the-ui)
-  - [Build `ghcr.io/maelvls/print-your-cert-controller:latest`](#build-ghcriomaelvlsprint-your-cert-controllerlatest)
   - [Local development on the controller (that creates PNGs and prints them)](#local-development-on-the-controller-that-creates-pngs-and-prints-them)
     - [`pem-to-png`](#pem-to-png)
+    - [Testing the printer](#testing-the-printer)
+    - [Testing pem-to-png](#testing-pem-to-png)
 - [Troubleshooting](#troubleshooting)
   - [From the CLI: `usb.core.USBError: [Errno 16] Resource busy`](#from-the-cli-usbcoreusberror-errno-16-resource-busy)
   - [From the web UI: `No such file or directory: '/dev/usb/lp1'`](#from-the-web-ui-no-such-file-or-directory-devusblp1)
-- [Testing](#testing)
-- [Intial set up of the Pi](#intial-set-up-of-the-pi)
-- [Build and push the image `ghcr.io/maelvls/print-your-cert-ui:latest`](#build-and-push-the-image-ghcriomaelvlsprint-your-cert-uilatest)
-- [Testing pem-to-png](#testing-pem-to-png)
-- [Set up the tunnel between the Internet and the Pi](#set-up-the-tunnel-between-the-internet-and-the-pi)
 
 ## Video and slides
 
@@ -233,238 +234,21 @@ things:
   > The public keys of each cert-manager org member have been added to the
   > `authorized_keys` of the Pi.
 
-## Running
+## Running everything on the Raspberry Pi (on the booth)
 
-Make sure that a k3s cluster is running on the Pi:
+Once on the booth, you will need to perform the three tasks:
 
-```sh
-$ kubectl get nodes
-NAME                       STATUS   ROLES                  AGE   VERSION
-k3d-k3s-default-server-0   Ready    control-plane,master   11m   v1.22.7+k3s1
-```
+1. [Booth: Intial set up of the Raspberry Pi](#booth-intial-set-up-of-the-raspberry-pi)
+1. [Prerequisite: install k3s](#prerequisite-install-k3s)
+1. [Booth: Run the UI on the Raspberry Pi](#booth-run-the-ui-on-the-raspberry-pi)
+1. [Booth: Running the printer controller on the Raspberry Pi](#booth-running-the-printer-controller-on-the-raspberry-pi)
 
-Make sure cert-manager is running:
+### Booth: Intial set up of the Raspberry Pi
 
-<a id="print-your-cert-ca"></a>
-
-```sh
-kubectl apply -f- <<EOF
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: self-signed
-  namespace: cert-manager
-spec:
-  selfSigned: {}
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: print-your-cert-ca
-  namespace: cert-manager
-spec:
-  isCA: true
-  privateKey:
-    algorithm: ECDSA
-    size: 256
-  secretName: print-your-cert-ca
-  commonName: The cert-manager maintainers
-  duration: 262800h # 30 years.
-  issuerRef:
-    name: self-signed
-    kind: Issuer
----
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: print-your-cert-ca
-  namespace: cert-manager
-spec:
-  ca:
-    secretName: print-your-cert-ca
-EOF
-```
-
-### Build the UI (`ghcr.io/maelvls/print-your-cert-ui:latest`)
-
-```sh
-# Multi-arch pushed to registry:
-GOARCH=arm64 go build -o print-your-cert-ui-arm64 .
-GOARCH=amd64 CGO_ENABLED=0 go build -o print-your-cert-ui-amd64 .
-docker buildx build -f Dockerfile.ui --platform amd64,linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-ui:latest --push .
-
-# Quicker: push directly to the Pi:
-GOARCH=arm64 go build -o print-your-cert-ui-arm64 .
-docker buildx build -f Dockerfile.ui --platform linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-ui:latest -o type=docker,dest=print-your-cert-ui.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert-ui.tar
-```
-
-To run the UI:
-
-```sh
-docker run -d --restart=always --name print-your-cert-ui --net=host -v $HOME/.kube/config:/root/.kube/config ghcr.io/maelvls/print-your-cert-ui:latest --issuer ca-issuer --issuer-kind ClusterIssuer --listen 0.0.0.0:8080
-```
-
-### Local development on the UI
-
-You will need the following tools installed:
-
-- [Go](https://go.dev/doc/install) (1.17 or above),
-- [K3d](https://k3d.io/stable/#install-current-latest-release),
-- [Helm](https://helm.sh/docs/intro/install/).
-
-The first step is to create a cluster with a cert-manager issuer:
-
-```sh
-k3d cluster create
-helm repo add jetstack https://charts.jetstack.io
-helm upgrade --install cert-manager jetstack/cert-manager --version v1.8.0 --namespace cert-manager --set installCRDs=true --create-namespace
-kubectl apply -f- <<EOF
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: self-signed
-  namespace: cert-manager
-spec:
-  selfSigned: {}
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: print-your-cert-ca
-  namespace: cert-manager
-spec:
-  isCA: true
-  privateKey:
-    algorithm: ECDSA
-    size: 256
-  secretName: print-your-cert-ca
-  commonName: The cert-manager maintainers
-  duration: 262800h # 30 years.
-  issuerRef:
-    name: self-signed
-    kind: Issuer
----
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: print-your-cert-ca
-  namespace: cert-manager
-spec:
-  ca:
-    secretName: print-your-cert-ca
-EOF
-```
-
-Finally, you can run the UI:
-
-```sh
-go run . --issuer=print-your-cert-ca --issuer-kind=ClusterIssuer
-```
-
-### Build `ghcr.io/maelvls/print-your-cert-controller:latest`
-
-Multi-arch:
-
-```sh
-# Multi-arch push:
-docker buildx build -f Dockerfile.controller --platform amd64,linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-controller:latest --push .
-
-# Or build and push directly to the Pi:
-docker buildx build -f Dockerfile.controller --platform linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-controller:latest -o type=docker,dest=print-your-cert-controller.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert-controller.tar
-```
-
-Run the controller:
-
-```sh
-docker run -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb -v $HOME/.kube/config:/root/.kube/config --net=host ghcr.io/maelvls/print-your-cert-controller:latest
-```
-
-Run the "debug" printer UI (brother_ql_web):
-
-```sh
-docker run -d --restart=always --name brother_ql_web --privileged -v /dev/bus/usb:/dev/bus/usb -p 0.0.0.0:8013:8013 ghcr.io/maelvls/print-your-cert-controller:latest brother_ql_web
-```
-
-### Local development on the controller (that creates PNGs and prints them)
-
-The controller is made in two pieces: `pem-to-png` that turns one PEM into two
-PNGs, and `print-your-cert-controller` that runs `pem-to-png` every time a
-certificate object in Kubernetes becomes ready.
-
-#### `pem-to-png`
-
-pem-to-png is what turns a PEM file into two PNGs: `front.png` and `back.png`.
-
-```sh
-brew install imagemagick qrencode step svn
-brew install homebrew/cask-fonts/font-open-sans
-brew install homebrew/cask-fonts/font-dejavu
-```
-
-To run it, for example:
-
-```sh
-./pem-to-png <<EOF
------BEGIN CERTIFICATE-----
-MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUw
-IwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEz
-MDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFy
-IDxmb28uYmFyQGJhci5mb28+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
-AQEAtmGM5lil9Vw/y5LhpgO8t5gSb5oUo+Dp5vWw0Z5C7rjvifi0/eD9MbVFkxb+
-+hmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF6
-7KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74+Nl6tyjlMOsTHv+LY0jPfm
-AtO6eR+Ef/HvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94Ycpg
-sJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh/QRv8ksX+OupHTNdH06
-WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYD
-VR0TAQH/BAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggq
-hkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIg
-aPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc=
------END CERTIFICATE-----
-EOF
-```
-
-## Troubleshooting
-
-### From the CLI: `usb.core.USBError: [Errno 16] Resource busy`
-
-On the Pi (over SSH), when running `brother_ql` with the following command:
-
-```text
-docker run --privileged -v /dev/bus/usb:/dev/bus/usb -it --rm ghcr.io/maelvls/print-your-cert-ui:latest brother_ql
-```
-
-you may hit the following message:
-
-```text
-usb.core.USBError: [Errno 16] Resource busy
-```
-
-I found that two reasons lead to this message:
-
-1. The primary reason is that libusb-1.0 is installed on the host (on the
-   Pi, that's Debian) and needs to be removed, and replaced with
-   libusb-0.1. You can read more about this in
-   <https://github.com/pyusb/pyusb/issues/391>.
-2. A second reason is that the label settings aren't correct (e.g., you
-   have select the black/red tape but the black-only tape is installed in
-   the printer).
-
-### From the web UI: `No such file or directory: '/dev/usb/lp1'`
-
-This happened when the printer was disconnected.
-
-## Testing
-
-Test that `brother_lp` works over USB on Pi:
-
-```shell=sh
-convert -size 230x30 -background white -font /usr/share/fonts/TTF/OpenSans-Regular.ttf -pointsize 25 -fill black -gravity NorthWest caption:"OK." -flatten example.png
-brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 example.png
-```
-
-## Intial set up of the Pi
-
-First, I used an SD card reader to set up Raspbian bullseye on the Pi using the Imager program. In the Imager program settings, I changed the username to `pi` and the password to something secret (usually the default password is `raspberry`, I changed it).
+First, I used an SD card reader to set up Raspbian bullseye on the Pi using the
+Imager program. In the Imager program settings, I changed the username to `pi`
+and the password to something secret (usually the default password is
+`raspberry`, I changed it).
 
 Then, mounted the micro SD card to my desktop did two things:
 
@@ -525,8 +309,6 @@ sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1
 sudo sysctl -w net.ipv4.ip_forward=1
 ```
 
-## Build and push the image `ghcr.io/maelvls/print-your-cert-ui:latest`
-
 Install Docker, vim and jq on the Pi:
 
 ```shell=sh
@@ -537,29 +319,7 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-Build the image on your desktop (faster) and then push it to the Pi. In order to build for `linux/arm64/v8` on my amd64 machine, I used docker's buildx:
-
-```sh
-sudo apt install -y qemu qemu-user-static
-docker buildx create --name mybuilder
-docker buildx use mybuilder
-docker buildx inspect --bootstrap
-docker buildx build --platform linux/arm64/v8 -t ghcr.io/maelvls/print-your-cert-ui:latest -o type=docker,dest=print-your-cert-ui.tar . && ssh pi@$(tailscale ip -4 pi) "docker load" <print-your-cert-ui.tar
-```
-
-## Testing pem-to-png
-
-```shell=sh
-openssl genrsa -out ca.key 2048
-openssl req -x509 -new -nodes -key ca.key -utf8 -subj "/CN=Maël Valais <mael@vls.dev>/O=Jetstack" -reqexts v3_req -extensions v3_ca -out ca.crt
-step certificate create "CN=Foo Bar <foo@bar.com>" foo.crt foo.key --ca ca.crt --ca-key ca.key --password-file /dev/null
-pem-to-png <foo.crt
-timg pem-to-png.png
-read
-brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 pem-to-png.png
-```
-
-## Set up the tunnel between the Internet and the Pi
+### Booth: Set up the tunnel between the Internet and the Raspberry Pi
 
 > At first, I tried using Wireguard to have a `wg0` interface on the Pi with a
 > public IP (like <http://hoppy.network> does). I documented this (failed)
@@ -592,8 +352,7 @@ https://print-your-cert.cert-manager.io
     +-------------------+
 ```
 
-To create the VM "wireguard" (which I should have called "tailscale") I used the
-following commands:
+To create the VM `tailscale` I used the following commands:
 
 ```shell
 gcloud compute firewall-rules create allow-tailscale \
@@ -603,7 +362,7 @@ gcloud compute firewall-rules create allow-tailscale \
     --direction ingress \
     --rules udp:41641 \
     --source-ranges 0.0.0.0/0
-gcloud compute instances create wireguard \
+gcloud compute instances create tailscale \
     --project jetstack-mael-valais \
     --network default \
     --machine-type=f1-micro \
@@ -619,7 +378,7 @@ Then, I copy-pasted the IP into the print-your-cert.cert-manager.io zone:
 1. Copy the IP:
 
    ```sh
-   IP=$(gcloud compute instances describe wireguard \
+   IP=$(gcloud compute instances describe tailscale \
        --project jetstack-mael-valais \
        --zone=europe-west1-b --format json \
          | jq -r '.networkInterfaces[].accessConfigs[] | select(.type=="ONE_TO_ONE_NAT") | .natIP')
@@ -634,27 +393,27 @@ Then, I copy-pasted the IP into the print-your-cert.cert-manager.io zone:
      --type=A --ttl=300 print-your-cert.cert-manager.io --rrdatas=$IP
    ```
 
-Then, I installed Tailscale and made sure IP forwarding is enabled on the VM:
+Then, install Tailscale and make sure IP forwarding is enabled on the VM:
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguard -- 'curl -fsSL https://tailscale.com/install.sh | sh'
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguard -- \
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b tailscale -- 'curl -fsSL https://tailscale.com/install.sh | sh'
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b tailscale -- \
     "sudo perl -ni -e 'print if \!/^net.ipv4.ip_forward=1/d' /etc/sysctl.conf; \
      sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1; \
      sudo sysctl -w net.ipv4.ip_forward=1"
 ```
 
-I logged in to Tailscale using my tailnet (maelvls@github):
+I logged in to Tailscale using my tailnet (`maelvls@github`):
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguard -- sudo tailscale up
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b tailscale -- sudo tailscale up
 ```
 
 Finally, I installed Caddy as a systemd unit by following [their
 guide](https://caddyserver.com/docs/install#debian-ubuntu-raspbian):
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguard -- bash <<'EOF'
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b tailscale -- bash <<'EOF'
 sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
@@ -664,7 +423,7 @@ EOF
 ```
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b wireguard -- bash <<'EOF'
+gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b tailscale -- bash <<'EOF'
 sudo tee /etc/caddy/Caddyfile <<CADDY
 print-your-cert.cert-manager.io:443 {
         reverse_proxy $(tailscale ip -4 pi):8080
@@ -673,3 +432,229 @@ CADDY
 sudo systemctl restart caddy.service
 EOF
 ```
+
+### Prerequisite: install k3s
+
+This prerequisite is useful both for local development and for running the
+experiment on the Raspberry Pi.
+
+You will need the following tools installed:
+
+- [Go](https://go.dev/doc/install) (1.17 or above),
+- [K3d](https://k3d.io/stable/#install-current-latest-release),
+- [Helm](https://helm.sh/docs/intro/install/).
+
+The first step is to create a cluster with a cert-manager issuer:
+
+<a id="print-your-cert-ca"></a>
+
+```sh
+k3d cluster create
+helm repo add jetstack https://charts.jetstack.io --force-update
+helm upgrade --install cert-manager jetstack/cert-manager --version v1.11.0 --namespace cert-manager --set installCRDs=true --create-namespace
+kubectl apply -f- <<EOF
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: self-signed
+  namespace: cert-manager
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: print-your-cert-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  secretName: print-your-cert-ca
+  commonName: The cert-manager maintainers
+  duration: 262800h # 30 years.
+  issuerRef:
+    name: self-signed
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: print-your-cert-ca
+  namespace: cert-manager
+spec:
+  ca:
+    secretName: print-your-cert-ca
+EOF
+```
+
+### Booth: Run the UI on the Raspberry Pi
+
+The UI doesn't run in Kubernetes (just because...). It runs as a container. It
+is a simple Go binary that serves an HTML site. Its container image name is
+`ghcr.io/cert-manager/print-your-cert-ui:latest`.
+
+```sh
+GOARCH=arm64 GOOS=linux go build -o print-your-cert-ui-arm64 .
+docker buildx build -f Dockerfile.ui --platform linux/arm64/v8 -t ghcr.io/cert-manager/print-your-cert-ui:latest -o type=docker,dest=print-your-cert-ui.tar . && ssh pi@$(tailscale ip -4 pi) docker load <print-your-cert-ui.tar
+```
+
+> **Note:** We don't actually push the image to GHCR. We just load it directly
+> on the Pi.
+
+Now, ssh into the Raspberry Pi and launch the UI:
+
+```sh
+ssh pi@pi
+docker run -d --restart=always --name print-your-cert-ui --net=host -v $HOME/.kube/config:/root/.kube/config ghcr.io/cert-manager/print-your-cert-ui:latest --issuer ca-issuer --issuer-kind ClusterIssuer --listen 0.0.0.0:8080
+```
+
+### Booth: Running the printer controller on the Raspberry Pi
+
+The printer controller is a simple Bash script (yeah, not Go). It doesn't run in
+Kubernetes just because it makes it easier to hot-reload everything on the
+booth. `ghcr.io/cert-manager/print-your-cert-controller:latest` is the container
+image name.
+
+Make sure that the k3s cluster is running that cert-manager is installed. If
+not, follow the [Prerequisite: install k3s](#prerequisite-install-k3s) section.
+
+You may need to install Qemu if you are on Linux. Then, create a buildx builder:
+
+```bash
+# This "apt install" is not needed on M1 macs if you use Colima.
+sudo apt install -y qemu qemu-user-static
+docker buildx create --name mybuilder
+docker buildx use mybuilder
+docker buildx inspect --bootstrap
+```
+
+Then, build the image on your desktop (faster than on the Pi) and then push it
+to the Pi.
+
+```sh
+docker buildx build -f Dockerfile.controller --platform linux/arm64/v8 -t ghcr.io/cert-manager/print-your-cert-controller:latest -o type=docker,dest=print-your-cert-controller.tar . && ssh pi@$(tailscale ip -4 pi) docker load <print-your-cert-controller.tar
+```
+
+> **Note:** We don't actually push the image to GHCR. We just load it directly
+> on the Pi.
+
+Now, ssh into the Raspberry Pi and launch the controller:
+
+```sh
+ssh pi@pi
+docker run -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb -v $HOME/.kube/config:/root/.kube/config --net=host ghcr.io/cert-manager/print-your-cert-controller:latest
+```
+
+You can also run the "debug" printer UI (brother_ql_web) if you want to make
+sure that the printer works:
+
+```sh
+docker run -d --restart=always --name brother_ql_web --privileged -v /dev/bus/usb:/dev/bus/usb -p 0.0.0.0:8013:8013 ghcr.io/cert-manager/print-your-cert-controller:latest brother_ql_web
+```
+
+## Local development
+
+### Local development on the UI
+
+You will need Go.
+
+First, follow the steps in [Prerequisite: install
+k3s](#prerequisite-install-k3s). Then, you can run the UI:
+
+````sh
+Finally, you can run the UI:
+
+```sh
+go run . --issuer=print-your-cert-ca --issuer-kind=ClusterIssuer
+````
+
+### Local development on the controller (that creates PNGs and prints them)
+
+The controller is made in two pieces: `pem-to-png` that turns one PEM into two
+PNGs, and `print-your-cert-controller` that runs `pem-to-png` every time a
+certificate object in Kubernetes becomes ready.
+
+#### `pem-to-png`
+
+pem-to-png is what turns a PEM file into two PNGs: `front.png` and `back.png`.
+
+```sh
+brew install imagemagick qrencode step svn
+brew install homebrew/cask-fonts/font-open-sans
+brew install homebrew/cask-fonts/font-dejavu
+```
+
+To run it, for example:
+
+```sh
+./pem-to-png <<EOF
+-----BEGIN CERTIFICATE-----
+MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUw
+IwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEz
+MDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFy
+IDxmb28uYmFyQGJhci5mb28+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
+AQEAtmGM5lil9Vw/y5LhpgO8t5gSb5oUo+Dp5vWw0Z5C7rjvifi0/eD9MbVFkxb+
++hmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF6
+7KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74+Nl6tyjlMOsTHv+LY0jPfm
+AtO6eR+Ef/HvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94Ycpg
+sJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh/QRv8ksX+OupHTNdH06
+WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYD
+VR0TAQH/BAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggq
+hkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIg
+aPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc=
+-----END CERTIFICATE-----
+EOF
+```
+
+#### Testing the printer
+
+Test that `brother_lp` works over USB on Pi:
+
+```shell=sh
+convert -size 230x30 -background white -font /usr/share/fonts/TTF/OpenSans-Regular.ttf -pointsize 25 -fill black -gravity NorthWest caption:"OK." -flatten example.png
+brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 example.png
+```
+
+#### Testing pem-to-png
+
+```shell=sh
+openssl genrsa -out ca.key 2048
+openssl req -x509 -new -nodes -key ca.key -utf8 -subj "/CN=Maël Valais <mael@vls.dev>/O=Jetstack" -reqexts v3_req -extensions v3_ca -out ca.crt
+step certificate create "CN=Foo Bar <foo@bar.com>" foo.crt foo.key --ca ca.crt --ca-key ca.key --password-file /dev/null
+pem-to-png <foo.crt
+timg pem-to-png.png
+read
+brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 pem-to-png.png
+```
+
+## Troubleshooting
+
+### From the CLI: `usb.core.USBError: [Errno 16] Resource busy`
+
+On the Pi (over SSH), when running `brother_ql` with the following command:
+
+```text
+docker run --privileged -v /dev/bus/usb:/dev/bus/usb -it --rm ghcr.io/cert-manager/print-your-cert-ui:latest brother_ql
+```
+
+you may hit the following message:
+
+```text
+usb.core.USBError: [Errno 16] Resource busy
+```
+
+I found that two reasons lead to this message:
+
+1. The primary reason is that libusb-1.0 is installed on the host (on the
+   Pi, that's Debian) and needs to be removed, and replaced with
+   libusb-0.1. You can read more about this in
+   <https://github.com/pyusb/pyusb/issues/391>.
+2. A second reason is that the label settings aren't correct (e.g., you
+   have select the black/red tape but the black-only tape is installed in
+   the printer).
+
+### From the web UI: `No such file or directory: '/dev/usb/lp1'`
+
+This happened when the printer was disconnected.
