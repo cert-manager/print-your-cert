@@ -64,7 +64,7 @@ line1=$(
     cat <<EOF
 Thank you for visiting the cert-manager
 booth! We hope you are enjoying
-your time in Valencia.
+your time in Amsterdam.
 EOF
 )
 

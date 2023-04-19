@@ -1,4 +1,7 @@
-# The "Print you certificate!" experiment at the cert-manager booth (KubeCon EU 2022 in Valencia)
+# The "Print you certificate!" experiment at the cert-manager booth at KubeCon
+
+This experiment was run at the cert-manager booth at KubeCon EU 2022 in
+Valencia, KubeCon NA 2022 in Detroit, and KubeCon EU 2023 in Amsterdam.
 
 ⚠️ The URLs an IPs presented in this README are guarenteed to work from 18 to
 20 May 2022, but may stop working afterwards.
