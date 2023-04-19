@@ -64,11 +64,11 @@
 
     <script>
       var url = new URL(window.location);
-      
+
       if (!url.searchParams.get("asn1")) {
-        window.location.replace("https://print-your-cert.cert-manager.xyz");
+        window.location.replace("https://print-your-cert.cert-manager.io");
       }
-      
+
       const cert = getAsn1();
       document.getElementById("placeholder-pem").innerHTML = cert;
       document.getElementById("placeholder-subject").innerHTML = cert.subject;
