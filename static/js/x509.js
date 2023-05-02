@@ -19,37 +19,34 @@ const params = new Proxy(new URLSearchParams(window.location.search), {
 //
 //   ?asn1=MIIDBzCCAe%2BgAwIBAgIJAOjyPj%2F8QWbTMBQUAMIGLMQswCQYD%0A
 //
+// Example of an actual URL:
+//
+//   https://cert-manager.github.io/print-your-cert/?asn1=MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUwIwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEzMDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFyIDxmb28uYmFyQGJhci5mb28%2BMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtmGM5lil9Vw%2Fy5LhpgO8t5gSb5oUo%2BDp5vWw0Z5C7rjvifi0%2FeD9MbVFkxb%2B%2BhmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF67KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74%2BNl6tyjlMOsTHv%2BLY0jPfmAtO6eR%2BEf%2FHvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94YcpgsJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh%2FQRv8ksX%2BOupHTNdH06WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH%2FBAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggqhkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIgaPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc%3D
+//
+// To check that a given ?asn1= query value works:
+//
+//   echo "MIIDBzCCA...LMQswCQYD%0A" | urldecode | base64 -d | openssl asn1parse -inform DER
 
-// Get the value of "asn1" in eg "https://example.com/?asn1=some_value". Note
-// that it is already URL decoded. We just have to re-add the headers.
-
+// The func getAsn1 gets the value of the query parameter "asn1" in
+// "https://example.com/?asn1=some_value".
 function getAsn1() {
-  var asn1 = params.asn1; // Example: "MIIDBzCCAe%2Bg...GLMQswCQYD%0A"
-  if (!asn1) {
+  var base64der = params.asn1; // Example: "MIIDBzCCAe%2Bg...GLMQswCQYD%0A"
+  if (!base64der) {
     throw new Error("the query parameter 'asn1' is missing");
   }
 
-  // Since the base64 part of the PEM-encoded certificate is expected by
-  // everyone to be wrapped at 76 chars (instead of a long line), let's re-wrap
-  // it to 76 chars. Solution copied from
-  // https://stackoverflow.com/questions/14484787.
-  asn1 = wordWrap(asn1, 76);
-
-  const pem =
-    "-----BEGIN CERTIFICATE-----\n" + asn1 + "-----END CERTIFICATE-----\n";
-
-  var cert;
   try {
-    cert = new x509.X509Certificate(pem);
+    // x509.X509Certificate can accept a base64 URL-encoded DER-encoded
+    // certificate, so we don't need to do any decoding.
+    cert = new x509.X509Certificate(base64der);
+    console.log(cert);
+    return cert;
   } catch (e) {
     throw new Error(
-      "the query parameter 'asn1' doesn't contain the base64 part of the PEM-encoded certificate"
+      "the query parameter 'asn1' doesn't contain the Base64URL of the DER-encoded certificate: " +
+        e
     );
   }
-
-  console.log(cert);
-
-  return cert;
 }
 
 // Copied from https://stackoverflow.com/a/14487422
