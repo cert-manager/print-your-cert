@@ -22,7 +22,7 @@
         <h2 class="secondaryTitle">Display your Certificate</h2>
 
         <div class="panel">
-          <div class="content">
+          <div class="content" id="content">
             <label>Subject</label>
             <div id="placeholder-subject"></div>
             <label>Issuer</label>
@@ -63,24 +63,29 @@
     </footer>
 
     <script>
-      var url = new URL(window.location);
-
-      if (!url.searchParams.get("asn1")) {
-        window.location.replace("https://print-your-cert.cert-manager.io");
+      try {
+        const cert = getAsn1();
+        document.getElementById("placeholder-pem").innerHTML = cert;
+        document.getElementById("placeholder-subject").innerHTML = cert.subject;
+        document.getElementById("placeholder-issuer").innerHTML = cert.issuer;
+        document.getElementById("placeholder-serial").innerHTML =
+          cert.serialNumber;
+        document.getElementById("placeholder-algorithm").innerHTML =
+          cert.signatureAlgorithm.name;
+        document.getElementById("placeholder-not-before").innerHTML =
+          cert.notBefore;
+        document.getElementById("placeholder-not-after").innerHTML =
+          cert.notAfter;
+      } catch (e) {
+        document.getElementById("content").innerHTML =
+          "Issue with the certificate: " + e;
       }
-
-      const cert = getAsn1();
-      document.getElementById("placeholder-pem").innerHTML = cert;
-      document.getElementById("placeholder-subject").innerHTML = cert.subject;
-      document.getElementById("placeholder-issuer").innerHTML = cert.issuer;
-      document.getElementById("placeholder-serial").innerHTML =
-        cert.serialNumber;
-      document.getElementById("placeholder-algorithm").innerHTML =
-        cert.signatureAlgorithm.name;
-      document.getElementById("placeholder-not-before").innerHTML =
-        cert.notBefore;
-      document.getElementById("placeholder-not-after").innerHTML =
-        cert.notAfter;
     </script>
   </body>
 </html>
+
+<!--
+  Example:
+
+  https://cert-manager.github.io/print-your-cert/?asn1=MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUwIwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEzMDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFyIDxmb28uYmFyQGJhci5mb28%2BMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtmGM5lil9Vw%2Fy5LhpgO8t5gSb5oUo%2BDp5vWw0Z5C7rjvifi0%2FeD9MbVFkxb%2B%2BhmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF67KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74%2BNl6tyjlMOsTHv%2BLY0jPfmAtO6eR%2BEf%2FHvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94YcpgsJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh%2FQRv8ksX%2BOupHTNdH06WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH%2FBAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggqhkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIgaPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc%3D
+-->
