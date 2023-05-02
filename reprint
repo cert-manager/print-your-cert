@@ -16,12 +16,13 @@ Usage:
 
 EOF
 
-set -euo pipefail
+	set -euo pipefail
 
-if ! [ $# -eq 1 ]; then
-	printf "error: you need to give the name of a certificate as argument.\n" >&2
-fi
-name=$1
+	if ! [ $# -eq 1 ]; then
+		printf "error: you need to give the name of a certificate as argument.\n" >&2
+	fi
+	name=$1
 
-./kubectl-curl --fail -sS -k -d '[{ "op": "replace", "path":"/status/conditions", "value": [] }]' -H "Content-Type: application/json-patch+json" -X PATCH "http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/$name/status" | jq
+	./kubectl-curl --fail -sS -k -d '[{ "op": "replace", "path":"/status/conditions", "value": [] }]' -H "Content-Type: application/json-patch+json" -X PATCH "http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/$name/status" | jq
 
+}
