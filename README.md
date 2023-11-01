@@ -1,10 +1,11 @@
 # The "Print you certificate!" experiment at the cert-manager booth at KubeCon
 
 This experiment was run at the cert-manager booth at KubeCon EU 2022 in
-Valencia, KubeCon NA 2022 in Detroit, and KubeCon EU 2023 in Amsterdam.
+Valencia, KubeCon NA 2022 in Detroit, KubeCon EU 2023 in Amsterdam,
+and KubeCon NA 2023 in Chicago.
 
-⚠️ The URLs an IPs presented in this README are guarenteed to work from 18 to
-20 May 2022, but may stop working afterwards.
+⚠️ Except for the URL <cert-manager.github.io/print-your-cert/> which should
+work forever, the other URLs and IPs presented in this README are temporary.
 
 <img alt="Photo of the cert-manager booth when we were running the Print your certificate experiment. A participant can be seen typing their name and email on the keyboard." src="https://user-images.githubusercontent.com/2195781/170957591-0cfcfb4d-05d8-41ad-bfa6-f6162e36479f.jpeg" width="300"/> <img alt="Liz Rice met with the cert-manager maintainers Charlie Egan, Josh van Leeuwen, and Jake Sanders with the cert-manager booth in the background. All credits for this image go to Liz Rice who shared this picture on Twitter at https://twitter.com/lizrice/status/1527585297743110145." src="https://user-images.githubusercontent.com/2195781/170959280-f78822a4-1ba8-416c-91dc-5e7dbc5da24b.png" width="300"/> <img alt="Dovy came to the cert-manager booth and took a picture of the card on which a stamp of the cert-manager project is visible, as well as the label showing their X.509 certificate. All credits for this photo go to Dovy who shared this picture on Twitter at https://twitter.com/ddovys/status/1526890240568344576." src="https://user-images.githubusercontent.com/2195781/170959287-125e5fab-52ab-43f5-8781-94af0d3cbb83.png" width="300"/>
 
@@ -43,10 +44,11 @@ Here are the slides Mael presented after KubeCon:
 
 When visiting the cert-manager booth, you will be welcomed and one of the staff
 may suggest to visit a QR code from their phone to participate to the "Print
-your certificate!" experiment.
+your certificate!" experiment, or to use the Raspberry Pi's keyboard and screen
+available on the booth.
 
-On their phone, the participant opens the QR code. The participant lands on a UI
-prompting for a name and email:
+Upon opening the QR code link (or on the Raspberry Pi's screen), the participant
+is shown a web page prompting for a name and email:
 
 <img alt="landing-1" src="https://user-images.githubusercontent.com/2195781/170956946-2f39e7d9-2b02-4ff8-a77f-e731c6db4510.png" width="500"/>
 
@@ -248,12 +250,21 @@ Once on the booth, you will need to perform the three tasks:
 
 ### Booth: Intial set up of the Raspberry Pi
 
-First, I used an SD card reader to set up Raspbian bullseye on the Pi using the
-Imager program. In the Imager program settings, I changed the username to `pi`
-and the password to something secret (usually the default password is
-`raspberry`, I changed it).
+> [!WARNING] If you need to upgrade Debian on the Raspberry Pi (`apt upgrade`),
+> please upgrade it at least a week before KubeCon so that any breakage (e.g.,
+> the Raspberry UI) can be fixed before the venue! We mistakenly ran `sudo apt
+> upgrade` on the first day of KubeCon in Amsterdam and ended up spending half
+> of the day fixing it!
 
-Then, mounted the micro SD card to my desktop did two things:
+First, unplug the micro SD card from the Raspberry Pi and plug it into your
+laptop using a micro-SD-to-SD card adaptor.
+
+Then, install Raspbian Bullseye on the Pi using the Imager program. In the
+Imager program settings, I changed the username to `pi` and the password to
+something secret (usually the default password is `raspberry`, I changed it).
+
+Then, you will need to mount the micro SD card to your laptop using a
+SD-to-micro-SD adaptor. Once the SD card is mounted, do the following:
 
 ```shell=sh
 # Enable SSH into the Pi.
@@ -296,15 +307,17 @@ EOF
 > sudo ifconfig wlan0 up
 > ```
 
-When I have access, I configure `authorized_keys` to accept anyone from the cert-manager org:
+When you have access to the Raspberry Pi over SSH, configure `authorized_keys`
+to accept anyone from the cert-manager org:
 
 ```shell=sh
 curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.com/orgs/cert-manager/members | jq '.[] | .login' -r | ssh -t pi@$(tailscale ip -4 pi) 'set -xe; while read -r i; do curl -LsS https://github.com/$i.keys | tee -a $HOME/.ssh/authorized_keys; done; cat $HOME/.ssh/authorized_keys | sort | sed -re 's/\s+$//' | uniq >a; mv a $HOME/.ssh/authorized_keys'
 ```
 
-Then I install Tailscale, and log in using my home account `mael65@gmail.com` and share the device to the Tail-net cert-manager@github.
+Then, install Tailscale and log in to Tailscale using your GitHub email and then
+share the device to the Tailnet `cert-manager@github`.
 
-I also need to enable IPv4 forwarding:
+You will also need to enable IPv4 forwarding:
 
 ```sh
 sudo perl -ni -e 'print if \!/^net.ipv4.ip_forward=1/d' /etc/sysctl.conf
@@ -312,7 +325,7 @@ sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1
 sudo sysctl -w net.ipv4.ip_forward=1
 ```
 
-Install Docker, vim and jq on the Pi:
+You will also need to install Docker, vim and jq on the Raspberry Pi:
 
 ```shell=sh
 sudo apt install -y vim jq
@@ -329,20 +342,20 @@ newgrp docker
 > process in
 > [public-ip-on-my-machine-using-wireguard](https://hackmd.io/@maelvls/public-ip-on-my-machine-using-wireguard).
 
-I want to expose the print-your-cert-ui on the Internet on
-<https://print-your-cert.cert-manager.io>, so I need to set up a TCP tunnel towards the
-Pi. I use Tailscale and Caddy on a GCP e2-micro VM (because f1-micro isn't
-available in Spain).
+We want to expose the print-your-cert UI on the Internet at
+<https://print-your-cert.cert-manager.io>. To do that, we use a f1-micro VM on
+GCP and use Caddy to terminate the TLS connections and to forward the
+connections to the Raspberry Pi's Tailscale IP.
 
 ```text
 https://print-your-cert.cert-manager.io
               |
               |
               v  34.77.191.67 (eth0)
-    +------------------+
-    |  VM "wireguard"  |
-    |                  |
-    +------------------+
+    +------------------------+
+    |  VM "print-your-cert"  |
+    |    Caddy + Tailscale   |
+    +------------------------+
               |  100.70.50.97 (tailscale0)
               |
               |
@@ -355,7 +368,11 @@ https://print-your-cert.cert-manager.io
     +-------------------+
 ```
 
-To create the VM `tailscale` I used the following commands:
+To create the VM `print-your-cert`, you can use the following command:
+
+> [!NOTE]
+> Use the GCP zone closest to the KubeCon venue. The examples below
+> use `us-central1-c` (Iowa) since the venue was in Chicago.
 
 ```shell
 gcloud compute firewall-rules create allow-tailscale \
@@ -365,7 +382,7 @@ gcloud compute firewall-rules create allow-tailscale \
     --direction ingress \
     --rules udp:41641 \
     --source-ranges 0.0.0.0/0
-gcloud compute instances create tailscale \
+gcloud compute instances create print-your-cert \
     --project jetstack-mael-valais \
     --network default \
     --machine-type=f1-micro \
@@ -373,17 +390,17 @@ gcloud compute instances create tailscale \
     --image-project=debian-cloud \
     --can-ip-forward \
     --boot-disk-size=10GB \
-    --zone=europe-west1-b
+    --zone=us-central1-c
 ```
 
-Then, I copy-pasted the IP into the print-your-cert.cert-manager.io zone:
+Then, copy-paste the IP into the print-your-cert.cert-manager.io zone:
 
 1. Copy the IP:
 
    ```sh
-   IP=$(gcloud compute instances describe tailscale \
+   IP=$(gcloud compute instances describe print-your-cert \
        --project jetstack-mael-valais \
-       --zone=europe-west1-b --format json \
+       --zone=us-central1-c --format json \
          | jq -r '.networkInterfaces[].accessConfigs[] | select(.type=="ONE_TO_ONE_NAT") | .natIP')
    ```
 
@@ -399,8 +416,8 @@ Then, I copy-pasted the IP into the print-your-cert.cert-manager.io zone:
 Then, install Tailscale and make sure IP forwarding is enabled on the VM:
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b tailscale -- 'curl -fsSL https://tailscale.com/install.sh | sh'
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b tailscale -- \
+gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-your-cert -- 'curl -fsSL https://tailscale.com/install.sh | sh'
+gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-your-cert -- \
     "sudo perl -ni -e 'print if \!/^net.ipv4.ip_forward=1/d' /etc/sysctl.conf; \
      sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1; \
      sudo sysctl -w net.ipv4.ip_forward=1"
@@ -409,14 +426,14 @@ gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b tailscal
 I logged in to Tailscale using my tailnet (`maelvls@github`):
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b tailscale -- sudo tailscale up
+gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-your-cert -- sudo tailscale up
 ```
 
 Finally, I installed Caddy as a systemd unit by following [their
 guide](https://caddyserver.com/docs/install#debian-ubuntu-raspbian):
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b tailscale -- bash <<'EOF'
+gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-your-cert -- bash <<'EOF'
 sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
@@ -426,7 +443,7 @@ EOF
 ```
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=europe-west1-b tailscale -- bash <<'EOF'
+gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-your-cert -- bash <<'EOF'
 sudo tee /etc/caddy/Caddyfile <<CADDY
 print-your-cert.cert-manager.io:443 {
         reverse_proxy $(tailscale ip -4 pi):8080
