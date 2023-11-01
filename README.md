@@ -250,7 +250,8 @@ Once on the booth, you will need to perform the three tasks:
 
 ### Booth: Intial set up of the Raspberry Pi
 
-> [!WARNING] If you need to upgrade Debian on the Raspberry Pi (`apt upgrade`),
+> [!WARNING]
+> If you need to upgrade Debian on the Raspberry Pi (`apt upgrade`),
 > please upgrade it at least a week before KubeCon so that any breakage (e.g.,
 > the Raspberry UI) can be fixed before the venue! We mistakenly ran `sudo apt
 > upgrade` on the first day of KubeCon in Amsterdam and ended up spending half
@@ -351,12 +352,12 @@ connections to the Raspberry Pi's Tailscale IP.
 https://print-your-cert.cert-manager.io
               |
               |
-              v  34.77.191.67 (eth0)
+              v  35.202.49.162 (eth0)
     +------------------------+
     |  VM "print-your-cert"  |
     |    Caddy + Tailscale   |
     +------------------------+
-              |  100.70.50.97 (tailscale0)
+              |  100.126.254.167 (tailscale0)
               |
               |
               |
@@ -404,8 +405,8 @@ Then, copy-paste the IP into the print-your-cert.cert-manager.io zone:
          | jq -r '.networkInterfaces[].accessConfigs[] | select(.type=="ONE_TO_ONE_NAT") | .natIP')
    ```
 
-2. I delegated `print-your-cert.cert-manager.io`. Anyone in the group
-   team-cert-manager@jetstack.io can update the `A` record:
+2. The zone `print-your-cert.cert-manager.io` is a delegated zone meant for print-your-cert.
+   Anyone in the Google group team-cert-manager@jetstack.io can update the `A` record:
 
    ```bash
    gcloud dns record-sets update --project cert-manager-io \
@@ -423,13 +424,14 @@ gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-you
      sudo sysctl -w net.ipv4.ip_forward=1"
 ```
 
-I logged in to Tailscale using my tailnet (`maelvls@github`):
+Then, log into Tailscale using your personal GitHub Tailnet (e.g., `maelvls.github`) with
+the command:
 
 ```sh
 gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-your-cert -- sudo tailscale up
 ```
 
-Finally, I installed Caddy as a systemd unit by following [their
+Finally, install Caddy as a systemd unit by following [the official
 guide](https://caddyserver.com/docs/install#debian-ubuntu-raspbian):
 
 ```sh
@@ -520,8 +522,8 @@ GOARCH=arm64 GOOS=linux go build -o print-your-cert-ui-arm64 .
 docker buildx build -f Dockerfile.ui --platform linux/arm64/v8 -t ghcr.io/cert-manager/print-your-cert-ui:latest -o type=docker,dest=print-your-cert-ui.tar . && ssh pi@$(tailscale ip -4 pi) docker load <print-your-cert-ui.tar
 ```
 
-> **Note:** We don't actually push the image to GHCR. We just load it directly
-> on the Pi.
+> [!NOTE]
+> We don't actually push the image to GHCR. We just load it directly to the Raspberry Pi.
 
 Now, ssh into the Raspberry Pi and launch the UI:
 
