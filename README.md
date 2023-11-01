@@ -315,8 +315,13 @@ to accept anyone from the cert-manager org:
 curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.com/orgs/cert-manager/members | jq '.[] | .login' -r | ssh -t pi@$(tailscale ip -4 pi) 'set -xe; while read -r i; do curl -LsS https://github.com/$i.keys | tee -a $HOME/.ssh/authorized_keys; done; cat $HOME/.ssh/authorized_keys | sort | sed -re 's/\s+$//' | uniq >a; mv a $HOME/.ssh/authorized_keys'
 ```
 
-Then, install Tailscale and log in to Tailscale using your GitHub email and then
-share the device to the Tailnet `cert-manager@github`.
+Then, install Tailscale and log in to Tailscale using your GitHub account (Sign
+In with GitHub -> Authorize Tailscale -> Single-user Tailnet).
+
+Then, share the device to the Tailnet `cert-manager@github` by going to
+<https://login.tailscale.com/admin/machines>, clicking on the machine
+print-your-cert, "Share...", copy the link, logout, log in using "Multi-user
+Tailnet", use the link to have the machine shared.
 
 You will also need to enable IPv4 forwarding:
 
@@ -424,7 +429,7 @@ gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-you
      sudo sysctl -w net.ipv4.ip_forward=1"
 ```
 
-Then, log into Tailscale using your personal GitHub Tailnet (e.g., `maelvls.github`) with
+Then, log into Tailscale using your personal GitHub Tailnet (e.g., `maelvls@github`) with
 the command:
 
 ```sh
