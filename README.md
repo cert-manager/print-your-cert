@@ -16,7 +16,7 @@ work forever, the other URLs and IPs presented in this README are temporary.
 - [Running everything on the Raspberry Pi (on the booth)](#running-everything-on-the-raspberry-pi-on-the-booth)
   - [Booth: Intial set up of the Raspberry Pi](#booth-intial-set-up-of-the-raspberry-pi)
   - [Booth: Set up the tunnel between the Internet and the Raspberry Pi](#booth-set-up-the-tunnel-between-the-internet-and-the-raspberry-pi)
-  - [Prerequisite: install k3s](#prerequisite-install-k3s)
+  - [Prerequisite: install k3s on the Raspberry Pi](#prerequisite-install-k3s-on-the-raspberry-pi)
   - [Booth: Run the UI on the Raspberry Pi](#booth-run-the-ui-on-the-raspberry-pi)
   - [Booth: Running the printer controller on the Raspberry Pi](#booth-running-the-printer-controller-on-the-raspberry-pi)
 - [Local development](#local-development)
@@ -241,14 +241,15 @@ things:
 
 ## Running everything on the Raspberry Pi (on the booth)
 
-Once on the booth, you will need to perform the three tasks:
+Once on the booth, you will need to perform these five tasks:
 
 1. [Booth: Intial set up of the Raspberry Pi](#booth-intial-set-up-of-the-raspberry-pi)
-1. [Prerequisite: install k3s](#prerequisite-install-k3s)
-1. [Booth: Run the UI on the Raspberry Pi](#booth-run-the-ui-on-the-raspberry-pi)
-1. [Booth: Running the printer controller on the Raspberry Pi](#booth-running-the-printer-controller-on-the-raspberry-pi)
+2. [Booth: Set up the tunnel between the Internet and the Raspberry Pi](#booth-set-up-the-tunnel-between-the-internet-and-the-raspberry-pi)
+3. [Prerequisite: install k3s on the Raspberry Pi](#prerequisite-install-k3s-on-the-raspberry-pi)
+4. [Booth: Run the UI on the Raspberry Pi](#booth-run-the-ui-on-the-raspberry-pi)
+5. [Booth: Running the printer controller on the Raspberry Pi](#booth-running-the-printer-controller-on-the-raspberry-pi)
 
-### Booth: Intial set up of the Raspberry Pi
+### Booth: Initial set up of the Raspberry Pi
 
 > [!WARNING]
 > If you need to upgrade Debian on the Raspberry Pi (`apt upgrade`),
@@ -260,9 +261,10 @@ Once on the booth, you will need to perform the three tasks:
 First, unplug the micro SD card from the Raspberry Pi and plug it into your
 laptop using a micro-SD-to-SD card adaptor.
 
-Then, install Raspbian Bullseye on the Pi using the Imager program. In the
-Imager program settings, I changed the username to `pi` and the password to
-something secret (usually the default password is `raspberry`, I changed it).
+Then, install Raspberry OS (Debian Bookworm) on the Pi using the Imager program.
+In the Imager program settings, I changed the username to `pi` and the password
+to something secret (usually the default password is `raspberry`, I changed it;
+see the label on the side of the Raspberry Pi).
 
 Then, you will need to mount the micro SD card to your laptop using a
 SD-to-micro-SD adaptor. Once the SD card is mounted, do the following:
@@ -308,20 +310,74 @@ EOF
 > sudo ifconfig wlan0 up
 > ```
 
-When you have access to the Raspberry Pi over SSH, configure `authorized_keys`
-to accept anyone from the cert-manager org:
+### Booth: Set Up Docker, Helm, K3d, and kubectl
 
-```shell=sh
-curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.com/orgs/cert-manager/members | jq '.[] | .login' -r | ssh -t pi@$(tailscale ip -4 pi) 'set -xe; while read -r i; do curl -LsS https://github.com/$i.keys | tee -a $HOME/.ssh/authorized_keys; done; cat $HOME/.ssh/authorized_keys | sort | sed -re 's/\s+$//' | uniq >a; mv a $HOME/.ssh/authorized_keys'
+First, SSH into the Pi:
+
+```bash
+ssh pi@$(tailscale ip -4 pi)
 ```
 
-Then, install Tailscale and log in to Tailscale using your GitHub account (Sign
-In with GitHub -> Authorize Tailscale -> Single-user Tailnet).
+Then, install Docker with the command:
+
+```bash
+curl -fsSL https://get.docker.com | sudo bash
+sudo groupadd docker
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+Also install `vim` and `jq`:
+
+```bash
+sudo apt install -y vim jq
+```
+
+Finally, install `k3d`, `helm`, and `kubectl`:
+
+```bash
+curl -Ls https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
+curl -Ls https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+```
+
+Finally, install Tailscale:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+
+### Booth: Set Up Tailscale and SSH to the Pi
+
+> [!IMPORTANT]
+>
+> Make sure to disable Tailscale's DNS resolution with `--disable-dns=true`. We
+> have seen a ton of problems with Tailscale's DNS resolution.
+
+To log into Tailscale, run the command:
+
+```sh
+tailscale up --disable-dns=true
+```
+
+It will open a browser window, allowing you to log in. Use your GitHub account
+to log in (Sign In with GitHub -> Authorize Tailscale -> Single-user Tailnet).
 
 Then, share the device to the Tailnet `cert-manager@github` by going to
 <https://login.tailscale.com/admin/machines>, clicking on the machine
 print-your-cert, "Share...", copy the link, logout, log in using "Multi-user
 Tailnet", use the link to have the machine shared.
+
+Go back to your laptop and run the following command to make sure everyone in
+the cert-manager org can SSH into the Pi:
+
+```bash
+curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.com/orgs/cert-manager/members \
+  | jq '.[] | .login' -r \
+  | ssh -t pi@$(tailscale ip -4 pi) \
+    'set -xe; while read -r i; do curl -LsS https://github.com/$i.keys | tee -a $HOME/.ssh/authorized_keys; done; cat $HOME/.ssh/authorized_keys | sort | sed -re 's/\s+$//' | uniq >a; mv a $HOME/.ssh/authorized_keys'
+```
 
 You will also need to enable IPv4 forwarding:
 
@@ -329,16 +385,6 @@ You will also need to enable IPv4 forwarding:
 sudo perl -ni -e 'print if \!/^net.ipv4.ip_forward=1/d' /etc/sysctl.conf
 sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1
 sudo sysctl -w net.ipv4.ip_forward=1
-```
-
-You will also need to install Docker, vim and jq on the Raspberry Pi:
-
-```shell=sh
-sudo apt install -y vim jq
-curl -fsSL https://get.docker.com | sudo bash
-sudo groupadd docker
-sudo usermod -aG docker $USER
-newgrp docker
 ```
 
 ### Booth: Set up the tunnel between the Internet and the Raspberry Pi
@@ -357,7 +403,7 @@ connections to the Raspberry Pi's Tailscale IP.
 https://print-your-cert.cert-manager.io
               |
               |
-              v  35.202.49.162 (eth0)
+              v  130.211.227.213 (eth0)
     +------------------------+
     |  VM "print-your-cert"  |
     |    Caddy + Tailscale   |
@@ -460,14 +506,15 @@ sudo systemctl restart caddy.service
 EOF
 ```
 
-### Prerequisite: install k3s
+### Prerequisite: install k3s on the Raspberry Pi
 
 This prerequisite is useful both for local development and for running the
 experiment on the Raspberry Pi.
 
-You will need the following tools installed:
+First, install the following tools:
 
 - [Go](https://go.dev/doc/install) (1.17 or above),
+- [Docker](https://docs.docker.com/engine/install/debian/),
 - [K3d](https://k3d.io/stable/#install-current-latest-release),
 - [Helm](https://helm.sh/docs/intro/install/).
 
@@ -478,7 +525,7 @@ The first step is to create a cluster with a cert-manager issuer:
 ```sh
 k3d cluster create
 helm repo add jetstack https://charts.jetstack.io --force-update
-helm upgrade --install cert-manager jetstack/cert-manager --version v1.11.0 --namespace cert-manager --set installCRDs=true --create-namespace
+helm upgrade --install cert-manager jetstack/cert-manager --namespace cert-manager --set installCRDs=true --create-namespace
 kubectl apply -f- <<EOF
 apiVersion: cert-manager.io/v1
 kind: Issuer
@@ -545,7 +592,8 @@ booth. `ghcr.io/cert-manager/print-your-cert-controller:latest` is the container
 image name.
 
 Make sure that the k3s cluster is running that cert-manager is installed. If
-not, follow the [Prerequisite: install k3s](#prerequisite-install-k3s) section.
+not, follow the section [Prerequisite: install k3s on the Raspberry
+Pi](#prerequisite-install-k3s-on-the-raspberry-pi).
 
 You may need to install Qemu if you are on Linux. Then, create a buildx builder:
 
@@ -564,7 +612,8 @@ to the Pi.
 docker buildx build -f Dockerfile.controller --platform linux/arm64/v8 -t ghcr.io/cert-manager/print-your-cert-controller:latest -o type=docker,dest=print-your-cert-controller.tar . && ssh pi@$(tailscale ip -4 pi) docker load <print-your-cert-controller.tar
 ```
 
-> **Note:** We don't actually push the image to GHCR. We just load it directly
+> [!NOTE]
+> We don't actually push the image to GHCR. We just load it directly
 > on the Pi.
 
 Now, ssh into the Raspberry Pi and launch the controller:
@@ -587,15 +636,19 @@ docker run -d --restart=always --name brother_ql_web --privileged -v /dev/bus/us
 
 You will need Go.
 
-First, follow the steps in [Prerequisite: install
-k3s](#prerequisite-install-k3s). Then, you can run the UI:
+First, follow the steps in [Prerequisite: install k3s on the
+Raspberry](#prerequisite-install-k3s-on-the-raspberry-pi) to install k3s on your
+local machine (it is the same as for the Raspberry Pi).
 
-````sh
-Finally, you can run the UI:
+Then, you will need to create a ClusterIssuer:
+
+```sh
+
+Then, you can run the UI:
 
 ```sh
 go run . --issuer=print-your-cert-ca --issuer-kind=ClusterIssuer
-````
+```
 
 ### Local development on the controller (that creates PNGs and prints them)
 
