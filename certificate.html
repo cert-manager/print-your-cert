@@ -20,30 +20,38 @@
       <h1 class="mainTitle">Print Your Certificate</h1>
       <div class="divider"></div>
       <div>
-        {{if .Certificate.Subject}}
-        <h2>Hi, {{.Name}} <{{.Email}}>!</h2>
+        {{if .Certificate}}
+        <h2>Hi, {{.Name}} &lt;{{.Email}}&gt;!</h2>
         <p>Here is your certificate:</p>
         <div class="panel">
           <div class="content">{{template "certificate" .Certificate}}</div>
           <img
-            src="static/images/certificate-icon.svg"
-            alt=""
-            class="iconBottom"
+          src="static/images/certificate-icon.svg"
+          alt=""
+          class="iconBottom"
           />
         </div>
-        {{else}}
-        <div class="success">The certificate is will appear shortly, this page will reload itself.</div>
-        {{end}} {{if .AlreadyPrinted}}
+        {{end}}
+
+        {{if .AlreadyPrinted}}
         <div class="success">The certificate has already been printed.</div>
-        {{end}} {{if .MarkedToBePrinted}}
+        {{end}}
+
+        {{if .MarkedToBePrinted}}
         <div class="success">The certificate is waiting to be printed.</div>
-        {{end}} {{if .Message}}
+        {{end}}
+
+        {{if .Message}}
         <div class="error">{{.Message}}</div>
-        {{end}} {{if .Error}}
+        {{end}}
+
+        {{if .Error}}
         <div class="error">
           <p>{{.Error}}</p>
         </div>
-        {{end}} {{if .Certificate.Subject}}
+        {{end}}
+
+        {{if .Certificate.Subject}}
         <div>
           {{if not .AlreadyPrinted}}
           <form method="POST" action="/print">
@@ -61,7 +69,8 @@
           </form>
         </div>
         {{end}}
-      </div class="divider"></div>
+      </div>
+      <div class="divider"></div>
       <div class="push"></div>
       <div>
         <a href="/">
