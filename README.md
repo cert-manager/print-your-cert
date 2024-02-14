@@ -133,7 +133,7 @@ For example:
 > It takes three steps to turn this PEM-encoded certificate into something that
 > can be given with the query parameter `?asn1=...`.
 >
-> 1. We remove the header and footer, i.e., we remove the lines `----c-BEGIN CERTIFICATE-----` and `-----END CERTIFICATE-----`). The result looks like
+> 1. We remove the header and footer, i.e., we remove the lines `-----BEGIN CERTIFICATE-----` and `-----END CERTIFICATE-----`). The result looks like
 >    this:
 >
 >    ```text
@@ -643,6 +643,42 @@ local machine (it is the same as for the Raspberry Pi).
 Then, you will need to create a ClusterIssuer:
 
 ```sh
+kubectl apply -f- <<EOF
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: self-signed
+  namespace: cert-manager
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: print-your-cert-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  secretName: print-your-cert-ca
+  commonName: The cert-manager maintainers
+  duration: 262800h # 30 years.
+  issuerRef:
+    name: self-signed
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: print-your-cert-ca
+  namespace: cert-manager
+spec:
+  ca:
+    secretName: print-your-cert-ca
+EOF
+```
 
 Then, you can run the UI:
 
