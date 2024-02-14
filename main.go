@@ -96,20 +96,19 @@ var tmpl = template.Must(template.ParseFS(templates, "*.html"))
 // blank form prompting them to fill in their name and email to receive a
 // certificate.
 //
-//   GET / HTTP/2.0
+//	GET / HTTP/2.0
 //
 // When the user submits their name and email, the user is redirected to
 // the same landing page, except it remember the name and email using query
 // parameters:
 //
-//   GET /?name=NAME&email=EMAIL HTTP/2.0
+//	GET /?name=NAME&email=EMAIL HTTP/2.0
 //
 // For debugging purposes, one can set the query parameter "debug" to
 // "true" (or any other value), and more information about the Kubernetes
 // Certificate resource gets displayed:
 //
-//   GET /?name=NAME&email=EMAIL&debug=true HTTP/2.0
-//
+//	GET /?name=NAME&email=EMAIL&debug=true HTTP/2.0
 func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -198,6 +197,10 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 					Kind:  *issuerKind,
 					Group: *issuerGroup,
 				},
+				PrivateKey: &certmanagerv1.CertificatePrivateKey{
+					Algorithm: certmanagerv1.ECDSAKeyAlgorithm,
+					Size:      256,
+				},
 			},
 		}, metav1.CreateOptions{})
 
@@ -228,9 +231,9 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 // When the user clicks the button "Go back to my certificate", they are
 // redirected to GET /.
 //
-//  POST /print HTTP/2.0
-//  Content-Type: application/x-www-form-urlencoded
-//  email=...&name=...
+//	POST /print HTTP/2.0
+//	Content-Type: application/x-www-form-urlencoded
+//	email=...&name=...
 func printPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/print" {
@@ -359,7 +362,7 @@ func parseNameAndEmail(nameAndEmail string) (name, email string, _ error) {
 // one on GitHub Pages (https://cert-manager.github.io/print-your-cert?asn1=...)
 // except that is also shows whether the certificate was printed or not.
 //
-//  GET /certificate?certName=mael-vls.dev HTTP/2.0
+//	GET /certificate?certName=mael-vls.dev HTTP/2.0
 func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/certificate" {
@@ -473,7 +476,7 @@ func isPendingPrint(cert *certmanagerv1.Certificate) bool {
 // When the user goes to /list, they see a list of the previously submitted
 // name and emails.
 //
-//  GET /list HTTP/2.0
+//	GET /list HTTP/2.0
 func listPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
