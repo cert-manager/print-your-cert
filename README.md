@@ -1,4 +1,8 @@
-# The "Print you certificate!" experiment at the cert-manager booth at KubeCon
+<p align="center">
+  <img src="https://raw.githubusercontent.com/cert-manager/cert-manager/d53c0b9270f8cd90d908460d69502694e1838f5f/logo/logo-small.png" height="256" width="256" alt="cert-manager project logo" />
+</p>
+
+# The "Print your certificate!" experiment at the cert-manager booth at KubeCon
 
 This experiment was run at the cert-manager booth at KubeCon EU 2022 in
 Valencia, KubeCon NA 2022 in Detroit, KubeCon EU 2023 in Amsterdam,
@@ -14,7 +18,7 @@ work forever, the other URLs and IPs presented in this README are temporary.
 - [What's the stack?](#whats-the-stack)
 - [Staff: test things](#staff-test-things)
 - [Running everything on the Raspberry Pi (on the booth)](#running-everything-on-the-raspberry-pi-on-the-booth)
-  - [Booth: Intial set up of the Raspberry Pi](#booth-intial-set-up-of-the-raspberry-pi)
+  - [Booth: Initial set up of the Raspberry Pi](#booth-intial-set-up-of-the-raspberry-pi)
   - [Booth: Set up the tunnel between the Internet and the Raspberry Pi](#booth-set-up-the-tunnel-between-the-internet-and-the-raspberry-pi)
   - [Prerequisite: install k3s on the Raspberry Pi](#prerequisite-install-k3s-on-the-raspberry-pi)
   - [Booth: Run the UI on the Raspberry Pi](#booth-run-the-ui-on-the-raspberry-pi)
