@@ -11,6 +11,41 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
+  name: root-print-your-cert-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  secretName: root-print-your-cert-ca
+  commonName: The cert-manager maintainers Root CA
+  subject:
+    organizations:
+    - CNCF
+    organizationalUnits:
+    - cert-manager
+  duration: 876000h # 100 years.
+  issuerRef:
+    name: self-signed
+    kind: Issuer
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: root-print-your-cert-ca-issuer
+  namespace: cert-manager
+spec:
+  ca:
+    secretName: root-print-your-cert-ca
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
   name: print-your-cert-ca
   namespace: cert-manager
 spec:
@@ -20,9 +55,20 @@ spec:
     size: 256
   secretName: print-your-cert-ca
   commonName: The cert-manager maintainers
-  duration: 262800h # 30 years.
+  subject:
+    organizations:
+    - CNCF
+    organizationalUnits:
+    - cert-manager
+    countries:
+    - GB
+    - US
+    - FR
+    - ES
+    - NL
+  duration: 438000h # 50 years.
   issuerRef:
-    name: self-signed
+    name: root-print-your-cert-ca-issuer
     kind: Issuer
 
 ---

@@ -5,13 +5,18 @@ set -uo pipefail
 # crashes.
 
 # For testing purposes, that allows me to run ./print-your-cert-controller
-# without having to put pem-to-png in my PATH.
+# without having to put cert-card in my PATH.
 export PATH="$PATH:$PWD"
+
+# set to a non-empty value to actually try to use a printer
+mock=${mock:-}
 
 printf "print-your-cert-controller is now watching certificates.\n"
 
 kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
+    certname=$(jq -r '.metadata.name | select(.)' <<<"$cert")
     annotation_value_print=$(jq -r '.metadata.annotations."print" | select(.)' <<<"$cert")
+    annotation_value_fetchkey=$(jq -r '.metadata.annotations."fetch-key" | select(.)' <<<"$cert")
     condition_status_ready=$(jq -r '.status.conditions[]? | select(.type == "Ready") | .status' <<<"$cert")
     condition_status_printed=$(jq -r '.status.conditions[]? | select(.type == "Printed") |  .status' <<<"$cert")
 
@@ -51,13 +56,24 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
 
         printf "%s: printing.\n" "$(jq -r .metadata.name <<<"$cert")"
 
-        if ! out=$(pem-to-png <<<"$pem" 2>&1); then
-            printf "%s: failed to generate front.png and back.png.\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
+        if ! out=$(cert-card $certname $annotation_value_fetchkey <<<"$pem" 2>&1); then
+            printf "%s: failed to generate front-....png and back-....png.\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
             continue
         fi
 
-        if ! out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 front.png 2>&1); then
-            printf "%s: failed to print front.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
+		out=
+		brother_rc=
+
+		if [[ -n $mock ]]; then
+			out="mocked output for front print"
+			brother_rc=0
+		else
+			out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 front-$certname.png 2>&1)
+			brother_rc=$?
+		fi
+
+        if [[ $brother_rc != 0 ]] ; then
+            printf "%s: failed to print front-$certname.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
             if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
                 -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
                 -d '[{"op": "add", "path": "/status/conditions", "value":[{
@@ -71,8 +87,19 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
             continue
         fi
 
-        if ! out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back.png 2>&1); then
-            printf "%s: failed to print back.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
+		out=
+		brother_rc=
+
+		if [[ -n $mock ]]; then
+			out="mocked output for front print"
+			brother_rc=0
+		else
+			out=out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back-$certname.png 2>&1)
+			brother_rc=$?
+		fi
+
+        if [[ $brother_rc != 0 ]] ; then
+            printf "%s: failed to print back-$certname.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
             if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
                 -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
                 -d '[{"op": "add", "path": "/status/conditions", "value":[{
@@ -91,7 +118,7 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
         if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
             -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
             -d '[{"op": "add", "path": "/status/conditions", "value":[{"type": "Printed", "status": "True"}]}]' 2>&1); then
-            printf "%s: failed to generate front.png and back.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
+            printf "%s: failed to generate front-....png and back-....png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
         fi
 
         continue
