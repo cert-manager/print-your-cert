@@ -331,6 +331,14 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
+`k3s` [requires the memory cgroup
+v2](https://github.com/k3s-io/k3s-ansible/issues/179#issuecomment-1065685291).
+To enable it, add the following flags to `/boot/cmdline.txt`:
+
+```text
+cgroup_memory=1 cgroup_enable=memory
+```
+
 Also install `vim` and `jq`:
 
 ```bash
@@ -356,13 +364,13 @@ curl -fsSL https://tailscale.com/install.sh | sh
 
 > [!IMPORTANT]
 >
-> Make sure to disable Tailscale's DNS resolution with `--disable-dns=true`. We
+> Make sure to disable Tailscale's DNS resolution with `--accept-dns=false`. We
 > have seen a ton of problems with Tailscale's DNS resolution.
 
 To log into Tailscale, run the command:
 
 ```sh
-tailscale up --disable-dns=true
+tailscale up --accept-dns=false
 ```
 
 It will open a browser window, allowing you to log in. Use your GitHub account
@@ -381,14 +389,6 @@ curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.c
   | jq '.[] | .login' -r \
   | ssh -t pi@$(tailscale ip -4 pi) \
     'set -xe; while read -r i; do curl -LsS https://github.com/$i.keys | tee -a $HOME/.ssh/authorized_keys; done; cat $HOME/.ssh/authorized_keys | sort | sed -re 's/\s+$//' | uniq >a; mv a $HOME/.ssh/authorized_keys'
-```
-
-You will also need to enable IPv4 forwarding:
-
-```sh
-sudo perl -ni -e 'print if \!/^net.ipv4.ip_forward=1/d' /etc/sysctl.conf
-sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1
-sudo sysctl -w net.ipv4.ip_forward=1
 ```
 
 ### Booth: Set up the tunnel between the Internet and the Raspberry Pi
@@ -584,8 +584,8 @@ docker buildx build -f Dockerfile.ui --platform linux/arm64/v8 -t ghcr.io/cert-m
 Now, ssh into the Raspberry Pi and launch the UI:
 
 ```sh
-ssh pi@pi
-docker run -d --restart=always --name print-your-cert-ui --net=host -v $HOME/.kube/config:/root/.kube/config ghcr.io/cert-manager/print-your-cert-ui:latest --issuer ca-issuer --issuer-kind ClusterIssuer --listen 0.0.0.0:8080
+ssh pi@$(tailscale ip -4 pi)
+docker run -d --restart=always --name print-your-cert-ui --net=host -v $HOME/.kube/config:/root/.kube/config ghcr.io/cert-manager/print-your-cert-ui:latest --issuer print-your-cert-ca --issuer-kind ClusterIssuer --listen 0.0.0.0:8080
 ```
 
 ### Booth: Running the printer controller on the Raspberry Pi
@@ -623,7 +623,7 @@ docker buildx build -f Dockerfile.controller --platform linux/arm64/v8 -t ghcr.i
 Now, ssh into the Raspberry Pi and launch the controller:
 
 ```sh
-ssh pi@pi
+ssh pi@$(tailscale ip -4 pi)
 docker run -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb -v $HOME/.kube/config:/root/.kube/config --net=host ghcr.io/cert-manager/print-your-cert-controller:latest
 ```
 
