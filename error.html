@@ -2,9 +2,6 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    {{if .Refresh}}
-    <meta http-equiv="refresh" content="{{.Refresh}}" />
-    {{end}}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -20,37 +17,17 @@
       <img src="static/images/logo.svg" alt="Logo" width="220" height="191" />
       <h1 class="mainTitle">Print Your Certificate</h1>
 
-      <p>
-      <strong>{{.CountPrinted}}</strong> certificates have already been
-      printed, and there are <strong>{{.CountPending}}</strong> waiting to be printed.
-      </p>
+      <div class="divider"></div>
+
+      <div class="error">{{.Error}}</div>
 
       <div class="divider"></div>
-      <div class="panel large">
-        <div class="content">
-          <table>
-            <thead class="header">
-              <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Date</th>
-                <th>State</th>
-              </tr>
-            </thead>
-            <tbody>
-              {{range .Certificates}}
-              <tr>
-                <td class="bold">{{.Position}}</td>
-                <td class="bold limit">{{.Name}}</td>
-                <td>{{.Date}}</td>
-                <td>{{.State}}</td>
-              </tr>
-              {{end}}
-            </tbody>
-          </table>
-        </div>
+
+      <div>
+        <a href="/">
+          <button type="submit" class="constrain">Go back to the creation page</button>
+        </a>
       </div>
-      <div class="push"></div>
     </div>
 
     <footer>
@@ -65,8 +42,5 @@
       Design by <a href="https://constantinchirila.com" target="_blank">Constantin Chirila</a>
       </p>
     </footer>
-    {{if .Debug}}
-    <pre>{{.Debug}}</pre>
-    {{end}}
   </body>
 </html>

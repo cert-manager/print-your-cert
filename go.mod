@@ -1,4 +1,4 @@
-module github.com/maelvls/print-your-cert
+module github.com/cert-manager/print-your-cert
 
 go 1.21
 

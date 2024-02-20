@@ -9,7 +9,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="static/styles.css" />
-    <meta http-equiv="refresh" content="2;URL=/certificate?certName={{.CertName}}">
+    <meta http-equiv="refresh" content="2;URL=/certificate?certName={{.CertName}}&fetchKey={{.FetchKey}}">
   </head>
 
   <body>
@@ -26,6 +26,7 @@
       </div>
       <form method="GET" action="/certificate" class="form">
         <input name="certName" type="text" value="{{.CertName}}" hidden required />
+        <input name="fetchKey" type="text" value="{{.FetchKey}}" hidden required />
         <input type="submit" value="Back to your certificate" class="constrain" />
       </form>
       {{end}}

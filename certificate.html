@@ -8,9 +8,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap"
-      rel="stylesheet"
-    />
+        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap"
+        rel="stylesheet"
+        />
     <link rel="stylesheet" href="static/styles.css" />
   </head>
 
@@ -19,6 +19,7 @@
       <img src="static/images/logo.svg" alt="Logo" width="220" height="191" />
       <h1 class="mainTitle">Print Your Certificate</h1>
       <div class="divider"></div>
+
       <div>
         {{if .Certificate}}
         <h2>Hi, {{.Name}} &lt;{{.Email}}&gt;!</h2>
@@ -26,11 +27,15 @@
         <div class="panel">
           <div class="content">{{template "certificate" .Certificate}}</div>
           <img
-          src="static/images/certificate-icon.svg"
-          alt=""
-          class="iconBottom"
-          />
+              src="static/images/certificate-icon.svg"
+              alt="An icon representing a certificate"
+              class="iconBottom"
+              />
         </div>
+        {{end}}
+
+        {{if .Refresh}}
+        <div class="success">The certificate will appear shortly, this page will reload itself.</div>
         {{end}}
 
         {{if .AlreadyPrinted}}
@@ -51,52 +56,75 @@
         </div>
         {{end}}
 
-        {{if .Certificate.Subject}}
+        {{if .Certificate }}
         <div>
           {{if not .AlreadyPrinted}}
+
           <form method="POST" action="/print">
             <input name="certName" type="text" value="{{.CertName}}" hidden />
+            <input name="fetchKey" type="text" value="{{.FetchKey}}" hidden />
             <button type="submit" class="constrain">Send to print</button>
           </form>
-          {{end}}
+
           <br />
+          {{end}}
+
+          <form method="GET" action="/cert-manager-bundle.tar">
+            <input name="certName" type="text" value="{{.CertName}}" hidden />
+            <input name="fetchKey" type="text" value="{{.FetchKey}}" hidden />
+            <button type="submit" class="constrain">
+              Download Cert Bundle Tarball
+            </button>
+          </form>
+
+          <br />
+
           <form method="GET" action="/download">
             <input name="certName" type="text" value="{{.CertName}}" hidden />
-            <p style="color: darkgreen"></p>
+            <input name="fetchKey" type="text" value="{{.FetchKey}}" hidden />
             <button type="submit" class="constrain">
-              Download in PEM format
+              Download PEM Certificate Chain
+            </button>
+          </form>
+
+          <br />
+
+          <form method="GET" action="/downloadpkey">
+            <input name="certName" type="text" value="{{.CertName}}" hidden />
+            <input name="fetchKey" type="text" value="{{.FetchKey}}" hidden />
+            <button type="submit" class="constrain">
+              Download PEM Private Key
             </button>
           </form>
         </div>
         {{end}}
-      </div>
-      <div class="divider"></div>
-      <div class="push"></div>
-      <div>
-        <a href="/">
-          <button type="submit" class="constrain">Go back to the creation page</button>
-        </a>
-      </div>
-    </div>
-    {{if .Debug}}
-    </div class="divider"></div>
-    <pre>{{.Debug}}</pre>
-    {{end}}
-    <footer>
-      <p>
-        Powered by
-        <a href="https://cert-manager.io" target="_blank">cert-manager.io</a>
-      </p>
-      <p class="small">
-        Project proudly supported by
-        <a href="https://jetstack.io" target="_blank">jetstack.io</a>
-      </p>
-      <p class="small">
-        Design by
-        <a href="https://constantinchirila.com" target="_blank"
-          >Constantin Chirila</a
-        >
-      </p>
-    </footer>
+
+        <div class="divider"></div>
+
+        <div>
+          <a href="/">
+            <button type="submit" class="constrain">Go back to the creation page</button>
+          </a>
+        </div>
+
+        {{if .Debug}}
+        <div class="divider"></div>
+        <pre>{{.Debug}}</pre>
+        {{end}}
+
+        <div class="divider"></div>
+
+        <footer>
+          <p>
+          Powered by <a href="https://cert-manager.io" target="_blank">cert-manager.io</a>
+          </p>
+          <p class="small">
+          Project proudly supported by
+          <a href="https://venafi.com" target="_blank">Venafi</a>
+          </p>
+          <p class="small">
+          Design by <a href="https://constantinchirila.com" target="_blank">Constantin Chirila</a>
+          </p>
+        </footer>
   </body>
 </html>

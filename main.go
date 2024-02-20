@@ -1,13 +1,19 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
+	"context"
 	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"embed"
 	_ "embed"
+	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -16,10 +22,9 @@ import (
 	"log"
 	"net/http"
 	"net/mail"
-	"regexp"
+	"net/url"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	apiutil "github.com/cert-manager/cert-manager/pkg/api/util"
@@ -46,6 +51,8 @@ var (
 const (
 	AnnotationPrint  = "print"
 	ConditionPrinted = "Printed"
+
+	AnnotationFetchKey = "fetch-key"
 )
 
 // Config attempts to load the in-cluster config and falls back to using
@@ -165,28 +172,29 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 			return
 		}
 
-		// Check that the "Name <email@foo.bar>" is under the common
-		// name limit of 64 bytes. Hopefully, that should be enough for
-		// most people, but let's help them out in case their name and
-		// email go above the limit.
-		commonName := fmt.Sprintf("%s <%s>", personName, email)
-		if len(commonName) > 64 {
-			msg := fmt.Sprintf("Oops, the common name formed using your name and email (%s) counts as %d bytes which goes beyond the common name limit of 64 bytes. Could you try abbreviating some part of your name and try again?", commonName, len(commonName))
-			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, CountPending: pending, Error: msg})
-			log.Printf("GET /: the user %q has given a common name %q that is above the 64 bytes limit", personName, commonName)
+		commonName := personName
+		if len(personName) > 64 {
+			commonName = personName[:63]
+		}
+
+		certName := emailToCertName(email)
+
+		fetchKeyRaw := make([]byte, 32)
+		if _, err := rand.Read(fetchKeyRaw); err != nil {
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Refresh: 5, Error: "Internal server error: failed to generate a fetch key"})
+			log.Printf("GET /: failed to generate a fetch key: %v", err)
 			return
 		}
 
-		// The email mael@vls.dev is transformed to mael-vls.dev so
-		// that we can use it as a "name" in Kubernetes. We don't
-		// expect any clashes since this project is meant to be used
-		// just for the duration of KubeCon EU 2022.
-		certName := emailToCertName(email)
+		fetchKey := hex.EncodeToString(fetchKeyRaw)
 
 		_, err = cmclient.CertmanagerV1().Certificates(*namespace).Create(r.Context(), &certmanagerv1.Certificate{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: certName,
+				Annotations: map[string]string{
+					AnnotationFetchKey: fetchKey,
+				},
 			},
 			Spec: certmanagerv1.CertificateSpec{
 				CommonName: commonName,
@@ -201,13 +209,14 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 					Algorithm: certmanagerv1.ECDSAKeyAlgorithm,
 					Size:      256,
 				},
+				EmailAddresses: []string{email},
 			},
 		}, metav1.CreateOptions{})
 
 		switch {
 		case k8serrors.IsAlreadyExists(err):
 			w.WriteHeader(409)
-			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, CountPending: pending, DuplicateURL: fmt.Sprintf("/certificate?certName=%s", certName)})
+			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, CountPrinted: printed, CountPending: pending, Duplicate: true})
 			log.Printf("GET /: cannot create due to duplicate certificate name %s", certName)
 			return
 		case err != nil:
@@ -219,8 +228,17 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 
 		// We don't display the certificate on this page. Instead, we do that in
 		// the endpoint /certificate?email=...
-		log.Printf("GET /: successfully created a certificate, redirecting to /certificate?certName=%s", certName)
-		http.Redirect(w, r, r.Referer()+"/certificate?certName="+certName, http.StatusFound)
+
+		query := url.Values{
+			"certName": []string{certName},
+			"fetchKey": []string{fetchKey},
+		}
+
+		destination := "/certificate?" + query.Encode()
+
+		log.Printf("GET /: successfully created a certificate, redirecting to %s", destination)
+
+		http.Redirect(w, r, destination, http.StatusFound)
 		tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Error: "Redirecting..."})
 	}
 }
@@ -234,8 +252,8 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 //	POST /print HTTP/2.0
 //	Content-Type: application/x-www-form-urlencoded
 //	email=...&name=...
-func printPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+func printPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/print" {
 			http.Error(w, fmt.Sprintf("The path %s is expected to be /print", r.URL.Path), http.StatusNotFound)
 			return
@@ -247,36 +265,18 @@ func printPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) fun
 		}
 
 		// Let's mark the certificate as "printable" in Kubernetes.
-		err := r.ParseForm()
-		if err != nil {
-			w.WriteHeader(400)
-			tmpl.ExecuteTemplate(w, "after-print.html", printPageData{Error: "Failed parsing the POST form."})
-			log.Printf("POST /: while parsing the form: %v", err)
-			return
-		}
 
-		certName := r.Form.Get("certName")
-		if certName == "" {
-			http.Error(w, "The form is missing the 'certName' field.", http.StatusBadRequest)
-			log.Printf("POST /: no 'certName' form parameter provided")
-			return
-		}
-
-		// Add the annotation "print: true" to the certificate.
-		cert, err := cmclient.CertmanagerV1().Certificates(*namespace).Get(r.Context(), certName, metav1.GetOptions{})
-		if err != nil {
-			w.WriteHeader(409)
-			tmpl.ExecuteTemplate(w, "after-print.html", printPageData{CertName: certName, Error: "This email has not been used to create a certificate previously."})
-			log.Printf("POST /: the certName %q has not been used to create a certificate previously", certName)
-			return
-		}
+		cert := CertFromContext(r.Context())
+		certName := cert.ObjectMeta.Name
+		fetchKey := FetchKeyFromContext(r.Context())
 
 		if cert.ObjectMeta.Annotations == nil {
 			cert.ObjectMeta.Annotations = make(map[string]string)
 		}
 
 		cert.ObjectMeta.Annotations[AnnotationPrint] = "true"
-		_, err = cmclient.CertmanagerV1().Certificates(*namespace).Update(r.Context(), cert, metav1.UpdateOptions{})
+
+		_, err := cmclient.CertmanagerV1().Certificates(*namespace).Update(r.Context(), cert, metav1.UpdateOptions{})
 		if err != nil {
 			w.WriteHeader(500)
 			tmpl.ExecuteTemplate(w, "after-print.html", printPageData{CertName: certName, Error: "Could not trigger the print of the certificate. Please go to the previous page and press the button again."})
@@ -286,36 +286,20 @@ func printPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) fun
 
 		// Done!
 		w.WriteHeader(200)
-		tmpl.ExecuteTemplate(w, "after-print.html", printPageData{CertName: certName})
+		tmpl.ExecuteTemplate(w, "after-print.html", printPageData{CertName: certName, FetchKey: fetchKey})
 		log.Printf("POST /: the certificate %s in namespace %s was added the annotation print:true", certName, *namespace)
-	}
+	})
 }
 
-func downloadPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+func downloadCertPage(kclient kubernetes.Interface) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			http.Error(w, fmt.Sprintf("Only the GET method is supported supported on the path %s.\n", r.URL.Path), http.StatusMethodNotAllowed)
 			return
 		}
 
-		certName := r.URL.Query().Get("certName")
-		if certName == "" {
-			http.Error(w, "No 'certName' query parameter provided.", 400)
-			log.Printf("GET /download: no 'certName' query parameter provided")
-			return
-		}
-
-		cert, err := cmclient.CertmanagerV1().Certificates(*namespace).Get(r.Context(), certName, metav1.GetOptions{})
-		switch {
-		case k8serrors.IsNotFound(err):
-			http.Error(w, "Certificate not found.", 404)
-			log.Printf("GET /download: certificate %q not found", certName)
-			return
-		case err != nil:
-			http.Error(w, "Error getting certificate.", 503)
-			log.Printf("GET /download: error getting certificate %q: %v", certName, err)
-			return
-		}
+		cert := CertFromContext(r.Context())
+		certName := cert.ObjectMeta.Name
 
 		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
 		if err != nil {
@@ -335,25 +319,141 @@ func downloadPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) 
 		// Give the PEM-encoded certificate to the user.
 		w.WriteHeader(200)
 		w.Header().Set("Content-Type", "application/x-pem-file")
-		w.Header().Set("Content-Disposition", `attachment; filename="cert.pem"`)
+		w.Header().Set("Content-Disposition", `attachment; filename="chain.pem"`)
 		w.Header().Set("Content-Length", strconv.Itoa(len(certPem)))
 		w.Write(certPem)
-	}
+	})
 }
 
-var nameAndEmailRe = regexp.MustCompile(`^(.*) <(.*)>$`)
+func downloadPrivateKeyPage(kclient kubernetes.Interface) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			http.Error(w, fmt.Sprintf("Only the GET method is supported supported on the path %s.\n", r.URL.Path), http.StatusMethodNotAllowed)
+			return
+		}
 
-func parseNameAndEmail(nameAndEmail string) (name, email string, _ error) {
-	if nameAndEmail == "" {
-		return "", "", errors.New("empty name and email")
+		cert := CertFromContext(r.Context())
+		certName := cert.ObjectMeta.Name
+
+		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
+		if err != nil {
+			http.Error(w, "A certificate already exists, but the secret does not exist. Try again later.", 423)
+			log.Printf("GET /download: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, *namespace, cert.Spec.SecretName)
+			return
+		}
+
+		keyPEM, ok := secret.Data["tls.key"]
+		if !ok {
+			http.Error(w, "The Secret does not contain a private key, try again later.", 423)
+			tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Error: "Internal issue with the stored certificate in Kubernetes."})
+			log.Printf("GET /downloadpkey: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
+			return
+		}
+
+		// Give the PEM-encoded private key to the user.
+		w.WriteHeader(200)
+		w.Header().Set("Content-Type", "application/x-pem-file")
+		w.Header().Set("Content-Disposition", `attachment; filename="pkey.pem"`)
+		w.Header().Set("Content-Length", strconv.Itoa(len(keyPEM)))
+		w.Write(keyPEM)
+	})
+}
+
+func downloadTarPage(kclient kubernetes.Interface) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			http.Error(w, fmt.Sprintf("Only the GET method is supported supported on the path %s.\n", r.URL.Path), http.StatusMethodNotAllowed)
+			return
+		}
+
+		cert := CertFromContext(r.Context())
+		certName := cert.ObjectMeta.Name
+
+		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
+		if err != nil {
+			http.Error(w, "A certificate already exists, but the secret does not exist. Try again later.", 423)
+			log.Printf("GET /download: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, *namespace, cert.Spec.SecretName)
+			return
+		}
+
+		certPEM, ok := secret.Data["tls.crt"]
+		if !ok {
+			http.Error(w, "The Secret does not contain a certificate, try again later.", 423)
+			tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Error: "Internal issue with the stored certificate in Kubernetes."})
+			log.Printf("GET /download: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
+			return
+		}
+
+		keyPEM, ok := secret.Data["tls.key"]
+		if !ok {
+			http.Error(w, "The Secret does not contain a private key, try again later.", 423)
+			tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Error: "Internal issue with the stored certificate in Kubernetes."})
+			log.Printf("GET /downloadpkey: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
+			return
+		}
+
+		var buf bytes.Buffer
+		tw := tar.NewWriter(&buf)
+
+		var files = []struct {
+			Name string
+			Body []byte
+		}{
+			{"chain.pem", certPEM},
+			{"pkey.pem", keyPEM},
+		}
+		for _, file := range files {
+			hdr := &tar.Header{
+				Name: file.Name,
+				Mode: 0600,
+				Size: int64(len(file.Body)),
+			}
+
+			if err := tw.WriteHeader(hdr); err != nil {
+				http.Error(w, "failed to write tar header", 500)
+				log.Printf("failed to write tar header: %v", err)
+				return
+			}
+
+			if _, err := tw.Write(file.Body); err != nil {
+				http.Error(w, "failed to write tar body", 500)
+				log.Printf("failed to write tar body: %v", err)
+				return
+			}
+		}
+
+		if err := tw.Close(); err != nil {
+			http.Error(w, "failed to write tar file", 500)
+			log.Printf("failed to write tar file: %v", err)
+			return
+		}
+
+		w.WriteHeader(200)
+		w.Header().Set("Content-Type", "application/x-tar")
+		w.Header().Set("Content-Disposition", `attachment; filename="cert-manager-bundle.tar"`)
+		w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
+		w.Write(buf.Bytes())
+	})
+}
+
+func parseNameAndEmail(cert *certmanagerv1.Certificate) (string, string, error) {
+	if cert == nil {
+		return "", "", errors.New("empty cert")
 	}
 
-	parts := nameAndEmailRe.FindStringSubmatch(nameAndEmail)
-	if len(parts) != 3 || parts[1] == "" || parts[2] == "" {
-		return "", "", fmt.Errorf("the name-and-email string '%s' does not follow the format 'John Doe <john@doe.co>', the regex '%v' parsed this: %v", emailToCertName(email), nameAndEmailRe.String(), strings.Join(parts, ", "))
+	name := cert.Spec.CommonName
+
+	if name == "" {
+		return "", "", errors.New("invalid certificate: empty name in CommonName")
 	}
 
-	return parts[1], parts[2], nil
+	if len(cert.Spec.EmailAddresses) != 1 {
+		return "", "", fmt.Errorf("invalid certificate: expected 1 email address but got %d", len(cert.Spec.EmailAddresses))
+	}
+
+	email := cert.Spec.EmailAddresses[0]
+
+	return name, email, nil
 }
 
 // After the user clicks "Get your certificate" on the landing page, and if the
@@ -362,9 +462,9 @@ func parseNameAndEmail(nameAndEmail string) (name, email string, _ error) {
 // one on GitHub Pages (https://cert-manager.github.io/print-your-cert?asn1=...)
 // except that is also shows whether the certificate was printed or not.
 //
-//	GET /certificate?certName=mael-vls.dev HTTP/2.0
-func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
+//	GET /certificate?certName=abcdef123 HTTP/2.0
+func certificatePage(kclient kubernetes.Interface) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/certificate" {
 			http.Error(w, fmt.Sprintf("The path %s contains is expected to be /.", r.URL.Path), http.StatusNotFound)
 			return
@@ -375,38 +475,10 @@ func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interfac
 			return
 		}
 
-		certName := r.URL.Query().Get("certName")
+		cert := CertFromContext(r.Context())
+		fetchKey := FetchKeyFromContext(r.Context())
 
-		// Happily return early if the name or email haven't been
-		// provided yet.
-		if certName == "" {
-			w.WriteHeader(400)
-			err := tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Error: "You need to provide the query parameter '?certName=...' with a non-empty value in the URL."})
-			if err != nil {
-				log.Printf("GET /certificate: 400: while executing the template: %v", err)
-			}
-			return
-		}
-
-		cert, err := cmclient.CertmanagerV1().Certificates(*namespace).Get(r.Context(), certName, metav1.GetOptions{})
-		switch {
-		case k8serrors.IsNotFound(err):
-			w.WriteHeader(404)
-			err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Error: fmt.Sprintf("The certificate named '%s' does not exist.", certName)})
-			if err != nil {
-				log.Printf("GET /certificate: 404: while executing the template: %v", err)
-			}
-			log.Printf("GET /certificate: 404: the certificate named %s in namespace %s was not found in Kubernetes: %v", certName, *namespace, err)
-			return
-		case err != nil:
-			w.WriteHeader(500)
-			err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Refresh: 5, Error: "Failed getting the certificate resource in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved."})
-			if err != nil {
-				log.Printf("GET /certificate: 500: while executing the template: %v", err)
-			}
-			log.Printf("GET /certificate: 500: while getting the Certificate %s in namespace %s in Kubernetes: %v", certName, *namespace, err)
-			return
-		}
+		certName := cert.ObjectMeta.Name
 
 		debug := r.URL.Query().Get("debug") != ""
 		debugMsg := ""
@@ -417,9 +489,7 @@ func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interfac
 			}
 		}
 
-		// Parse the email and personName out of the common personName. The common personName is
-		// of the form 'John Doe <john@doe.io>'.
-		personName, email, err := parseNameAndEmail(cert.Spec.CommonName)
+		personName, email, err := parseNameAndEmail(cert)
 		if err != nil {
 			w.WriteHeader(500)
 			tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Error: "There is an issue with the certificate's common name. Please let know the cert-manager booth staff.", Debug: debugMsg})
@@ -430,11 +500,10 @@ func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interfac
 			return
 		}
 
-		// Success: we found the Certificate in Kubernetes. Let us see
-		// if it is ready.
+		// Success: we found the Certificate in Kubernetes. Let's see if it's ready.
 		if !isReady(cert) {
 			w.WriteHeader(423)
-			err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, CanPrint: false, MarkedToBePrinted: false, AlreadyPrinted: false, Refresh: 5, Message: "Your certificate is being issued by cert-manager. The page will reload automatically in 5 seconds.", Debug: debugMsg})
+			err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, FetchKey: fetchKey, CanPrint: false, MarkedToBePrinted: false, AlreadyPrinted: false, Refresh: 5, Debug: debugMsg})
 			if err != nil {
 				log.Printf("GET /certificate: 423: while executing the template: %v", err)
 			}
@@ -446,7 +515,7 @@ func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interfac
 		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
 		if err != nil {
 			w.WriteHeader(423)
-			err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, Refresh: 5, Error: "A certificate already exists, but the Secret does not exist; the page will be reloaded in 5 seconds until this issue is resolved.", Debug: debugMsg})
+			err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, FetchKey: fetchKey, Refresh: 5, Error: "A certificate already exists, but the Secret does not exist; the page will be reloaded in 5 seconds until this issue is resolved.", Debug: debugMsg})
 			if err != nil {
 				log.Printf("GET /certificate: 423: while executing the template: %v", err)
 			}
@@ -459,7 +528,7 @@ func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interfac
 		certPem, ok := secret.Data["tls.crt"]
 		if !ok {
 			w.WriteHeader(423)
-			err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, Refresh: 5, Error: "Internal issue with the stored certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
+			err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, FetchKey: fetchKey, Refresh: 5, Error: "Internal issue with the stored certificate in Kubernetes. The page will be reloaded every 5 seconds until this issue is resolved.", Debug: debugMsg})
 			if err != nil {
 				log.Printf("GET /certificate: 423: while executing the template: %v", err)
 			}
@@ -472,7 +541,7 @@ func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interfac
 		x509Cert, err := x509.ParseCertificate(certBlock.Bytes)
 		if err != nil {
 			w.WriteHeader(500)
-			err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, Error: "Internal issue with parsing the issued certificate when parsing it.", Debug: debugMsg})
+			err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, FetchKey: fetchKey, Error: "Internal issue with parsing the issued certificate when parsing it.", Debug: debugMsg})
 			if err != nil {
 				log.Printf("GET /certificate: 500: while executing the template: %v", err)
 			}
@@ -489,11 +558,11 @@ func certificatePage(kclient kubernetes.Interface, cmclient cmversioned.Interfac
 		certificateHTMLData := certificateToHTML(x509Cert)
 
 		log.Printf("GET /certificate: 200: certificate %s in namespace %s was found", certName, *namespace)
-		err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, Certificate: &certificateHTMLData, CanPrint: canPressPrintButton, MarkedToBePrinted: pendingPrint, AlreadyPrinted: alreadyPrinted, Debug: debugMsg})
+		err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, FetchKey: fetchKey, Certificate: &certificateHTMLData, CanPrint: canPressPrintButton, MarkedToBePrinted: pendingPrint, AlreadyPrinted: alreadyPrinted, Debug: debugMsg})
 		if err != nil {
 			log.Printf("GET /certificate: 200: while executing the template: %v", err)
 		}
-	}
+	})
 }
 
 func isPendingPrint(cert *certmanagerv1.Certificate) bool {
@@ -542,17 +611,18 @@ func listPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 		})
 
 		var certsOut []certificateItem
-		for _, cert := range certs.Items {
-			personName, email, err := parseNameAndEmail(cert.Spec.CommonName)
+		for i, cert := range certs.Items {
+			personName, email, err := parseNameAndEmail(&cert)
 			if err != nil {
 				log.Printf("GET /list: while listing certificates, the certificate %s was skipped: %v", cert.Name, err)
 				continue
 			}
 			certsOut = append(certsOut, certificateItem{
-				Name:  personName,
-				Email: email,
-				State: stateOfCert(cert),
-				Date:  cert.Status.NotBefore.Time,
+				Position: i + 1,
+				Name:     personName,
+				Email:    email,
+				State:    stateOfCert(cert),
+				Date:     cert.Status.NotBefore.Time,
 			})
 		}
 
@@ -591,11 +661,8 @@ func isReady(cert *certmanagerv1.Certificate) bool {
 }
 
 func emailToCertName(email string) string {
-	certName := strings.ReplaceAll(email, "@", "-")
-	certName = strings.ReplaceAll(certName, "_", "-")
-	certName = strings.ReplaceAll(certName, " ", "")
-	certName = strings.ToLower(certName)
-	return certName
+	h := sha256.Sum256([]byte(email))
+	return hex.EncodeToString(h[:])
 }
 
 func stateOfCert(cert certmanagerv1.Certificate) StateCert {
@@ -622,11 +689,12 @@ type landingPageData struct {
 	Refresh           int                      // Optional. In seconds.
 	CountPrinted      int                      // Mandatory.
 	CountPending      int                      // Mandatory.
-	DuplicateURL      string
+	Duplicate         bool
 }
 
 type printPageData struct {
 	CertName string // Mandatory.
+	FetchKey string // Mandatory.
 	Error    string // Optional.
 }
 
@@ -640,10 +708,14 @@ var (
 	StatePrinted      StateCert = "Printed"
 )
 
+type errorPageData struct {
+	Error string
+}
+
 type listPageData struct {
-	Certificates []certificateItem // Optionnal.
-	Error        string            // Optionnal.
-	Refresh      int               // Optionnal. In seconds.
+	Certificates []certificateItem // Optional.
+	Error        string            // Optional.
+	Refresh      int               // Optional. In seconds.
 	CountPrinted int               // Mandatory.
 	CountPending int               // Mandatory.
 }
@@ -670,6 +742,7 @@ type certificatePageData struct {
 	Name              string                   // Optional.
 	Email             string                   // Optional.
 	CertName          string                   // Mandatory.
+	FetchKey          string                   // Required if successful
 	Certificate       *certificateTemplateData // Optional.
 	Error             string                   // Optional.
 	Message           string                   // Optional.
@@ -693,9 +766,118 @@ func certificateToHTML(cert *x509.Certificate) certificateTemplateData {
 	return data
 }
 
-func addCachingHeaders(h http.Header) {
-	h.Set("Vary", "Accept-Encoding")
-	h.Set("Cache-Control", "public, max-age=7776000")
+type contextKey int
+
+const (
+	certificateContextKey contextKey = 0
+	fetchKeyContextKey    contextKey = 1
+)
+
+func CertFromContext(ctx context.Context) *certmanagerv1.Certificate {
+	cert, ok := ctx.Value(certificateContextKey).(*certmanagerv1.Certificate)
+	if !ok {
+		panic("CertFromContext called without certFetch middleware being called first")
+	}
+
+	return cert
+}
+
+func FetchKeyFromContext(ctx context.Context) string {
+	cert, ok := ctx.Value(fetchKeyContextKey).(string)
+	if !ok {
+		panic("FetchKeyFromContext called without certFetch middleware being called first")
+	}
+
+	return cert
+}
+
+func cachingHeadersMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Vary", "Accept-Encoding")
+		w.Header().Set("Cache-Control", "public, max-age=7776000")
+
+		h.ServeHTTP(w, req)
+	})
+
+}
+
+func certFetchMiddleware(cmclient cmversioned.Interface, h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var certName string
+		var fetchKey string
+		var source string
+
+		if r.Method != "GET" {
+			source = "form entry"
+
+			err := r.ParseForm()
+			if err != nil {
+				w.WriteHeader(400)
+				tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Failed to parse a valid POSTed form"})
+				log.Printf("certFetch: error while parsing form: %v", err)
+				return
+			}
+
+			certName = r.Form.Get("certName")
+			fetchKey = r.Form.Get("fetchKey")
+		} else {
+			source = "query parameter"
+
+			certName = r.URL.Query().Get("certName")
+			fetchKey = r.URL.Query().Get("fetchKey")
+		}
+
+		if certName == "" {
+			w.WriteHeader(400)
+			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: fmt.Sprintf("Missing required %s certName", source)})
+			return
+		}
+
+		if fetchKey == "" {
+			w.WriteHeader(401)
+			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: fmt.Sprintf("Missing required %s fetchKey", source)})
+			return
+		}
+
+		cert, err := cmclient.CertmanagerV1().Certificates(*namespace).Get(r.Context(), certName, metav1.GetOptions{})
+		switch {
+		case k8serrors.IsNotFound(err):
+			w.WriteHeader(404)
+			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "No certificate found matching that name"})
+			log.Printf("certFetch: the certificate named %s in namespace %s was not found in Kubernetes: %v", certName, *namespace, err)
+			return
+
+		case err != nil:
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Failed getting the certificate resource in Kubernetes."})
+			log.Printf("certFetch: while getting the Certificate %s in namespace %s in Kubernetes: %v", certName, *namespace, err)
+			return
+		}
+
+		fetchKeyAnnotation, ok := cert.ObjectMeta.Annotations[AnnotationFetchKey]
+		if !ok {
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Invalid certificate; no fetch-key found"})
+			log.Printf("certFetch: invalid certificate; no fetch-key found")
+			return
+		}
+
+		// check if the user provided the correct fetchKey - this prevents users from fetching certs
+		// belonging to other people
+		if fetchKeyAnnotation != fetchKey {
+			w.WriteHeader(401)
+			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Access denied: did you use the QR code from your printed certificate?"})
+			log.Printf("certFetch: access denied for cert %s", certName)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), certificateContextKey, cert)
+		ctx = context.WithValue(ctx, fetchKeyContextKey, fetchKey)
+
+		r = r.WithContext(ctx)
+
+		h.ServeHTTP(w, r)
+	})
 }
 
 func main() {
@@ -721,16 +903,16 @@ func main() {
 	}
 
 	http.HandleFunc("/", landingPage(kclient, cmclient))
-	http.HandleFunc("/print", printPage(kclient, cmclient))
-	http.HandleFunc("/download", downloadPage(kclient, cmclient))
 	http.HandleFunc("/list", listPage(kclient, cmclient))
-	http.HandleFunc("/certificate", certificatePage(kclient, cmclient))
-	fileserver := http.FileServer(http.FS(static))
-	fileserver = http.StripPrefix("/", fileserver)
-	http.Handle("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		addCachingHeaders(w.Header())
-		fileserver.ServeHTTP(w, r)
-	}))
+
+	http.Handle("/print", certFetchMiddleware(cmclient, printPage(kclient, cmclient)))
+	http.Handle("/download", certFetchMiddleware(cmclient, downloadCertPage(kclient)))
+	http.Handle("/downloadpkey", certFetchMiddleware(cmclient, downloadPrivateKeyPage(kclient)))
+	http.Handle("/cert-manager-bundle.tar", certFetchMiddleware(cmclient, downloadTarPage(kclient)))
+	http.Handle("/certificate", certFetchMiddleware(cmclient, certificatePage(kclient)))
+
+	fileserver := http.StripPrefix("/", http.FileServer(http.FS(static)))
+	http.Handle("/static/", cachingHeadersMiddleware(fileserver))
 
 	fmt.Printf("Listening on http://" + *listen + ".\n")
 	if err := http.ListenAndServe(*listen, nil); err != nil {

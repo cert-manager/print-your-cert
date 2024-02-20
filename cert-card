@@ -1,11 +1,16 @@
 #! /usr/bin/env bash
 
-# entr bash -c "./pem-to-png <foo.crt" <<<$'pem-to-png\n'
-
 set -euo pipefail
 
+certname=${1:-}
+fetchkey=${2:-}
+
+if [[ -z $certname || -z $fetchkey ]]; then
+	echo "usage: $0 <certname> <fetchkey>"
+fi
+
 echo "Reading PEM from stdin..." >&2
-cat >/tmp/crt
+cat >/tmp/crt-$certname
 
 # When printing to the Brother QL-820WNB, the width of the image (as opposed to
 # the height) is scaled to the 6.2 cm of the label tape's width. In the
@@ -82,14 +87,12 @@ EOF
 convert -size 696x492 canvas:white \
     \( -gravity NorthWest -font Open-Sans-Regular -pointsize 22 -fill black -annotate +0-0 "$line1" \) -geometry +0+0 \
     \( -gravity NorthWest -font Open-Sans-Regular -pointsize 22 -fill black -annotate +0+115 "$line2" \) -geometry +0+0 \
-    \( -gravity SouthWest -font DejaVu-Sans-Mono -pointsize 22 -fill black -annotate +0+0 "$(step certificate inspect --short /tmp/crt | sed -e 's/\[\(.*\)\]/\n\1/' -e 's/Certificate (\(.*\))/Certificate\nAlgorithm: \1/' | sed 's/^  //')" \) -geometry +0+0 \
-    -background None -layers Flatten front.png
+    \( -gravity SouthWest -font DejaVu-Sans-Mono -pointsize 22 -fill black -annotate +0+0 "$(step certificate inspect --short /tmp/crt-$certname | sed -e 's/\[\(.*\)\]/\n\1/' -e 's/Certificate (\(.*\))/Certificate\nAlgorithm: \1/' | sed 's/^  //')" \) -geometry +0+0 \
+    -background None -layers Flatten front-$certname.png
 
-# See js/x509.js to understand the format expected by the asn1 query parameter.
-url=$(grep -v 'CERTIFICATE' /tmp/crt | tr -d '$\n' | python3 -c "import urllib.parse; print(urllib.parse.quote_plus(open(0).read()))")
-echo "https://cert-manager.github.io/print-your-cert?asn1=$url" >&2
-echo "https://cert-manager.github.io/print-your-cert?asn1=$url" | qrencode --type PNG --margin 0 -o - | convert -size 696x492 canvas:white \
-    \( -gravity Center -monochrome -filter point -interpolate nearest - -resize 492 \) -composite back.png
-
-# Example:
-# https://cert-manager.github.io/print-your-cert?asn1=MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUwIwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEzMDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFyIDxmb28uYmFyQGJhci5mb28%2BMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtmGM5lil9Vw%2Fy5LhpgO8t5gSb5oUo%2BDp5vWw0Z5C7rjvifi0%2FeD9MbVFkxb%2B%2BhmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF67KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74%2BNl6tyjlMOsTHv%2BLY0jPfmAtO6eR%2BEf%2FHvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94YcpgsJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh%2FQRv8ksX%2BOupHTNdH06WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH%2FBAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggqhkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIgaPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc%3D
+# TODO: update this URL
+# url="http://print-your-cert.cert-manager.io/certificate?certName=$certname&fetchKey=$fetchkey"
+url="http://192.168.1.171:8080/certificate?certName=$certname&fetchKey=$fetchkey"
+echo "$url" >&2
+echo "$url" | qrencode --type PNG --margin 4 -o - | convert -size 696x492 canvas:white \
+    \( -gravity Center -monochrome -filter point -interpolate nearest - -resize 492 \) -composite back-$certname.png

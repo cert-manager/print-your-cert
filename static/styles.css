@@ -59,7 +59,7 @@ p {
   display: inline-block;
   width: 300px;
   border: 1px solid rgba(255, 255, 255, 0.5);
-  margin: 10px 0 40px 0;
+  margin: 20px 0 20px 0;
 }
 @media only screen and (max-width: 500px) {
   .divider {
@@ -239,3 +239,8 @@ tr td {
 tr td.bold {
   font-weight: 700;
 }
+tr td.limit {
+	overflow-wrap: break-word;
+	max-width: 200px;
+}
+

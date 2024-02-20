@@ -8,51 +8,57 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap"
-      rel="stylesheet"
-    />
+        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap"
+        rel="stylesheet"
+        />
     <link rel="stylesheet" href="static/styles.css" />
   </head>
 
   <body>
     <div class="wrapper">
-      <br />
       <img src="static/images/logo.svg" alt="Logo" width="220" height="191" />
       <h1 class="mainTitle">Print Your Certificate</h1>
+      <h2>Powered by cert-manager</h2>
+
+      <div class="divider"></div>
+
+      <div>
+        <p>
+        <strong>{{.CountPrinted}}</strong> certificates have already been
+        printed, and there are <strong>{{.CountPending}}</strong> waiting to be printed.
+        See <a href="/list">the list</a>.
+        </p>
+        <p>
+        Fill in your details and create your very own certificate which will
+        get printed for you to take home.
+        </p>
+      </div>
 
       <div class="divider"></div>
 
       <form method="GET" action="/" class="form">
-        <p>
-          <strong>{{.CountPrinted}}</strong> certificates have already been
-          printed, and <strong>{{.CountPending}}</strong> waiting to be printed.
-          See <a href="/list">the list</a>.
-        </p>
-        <p>
-          Fill in your details and create your very own certificate which will
-          get printed for you to take home.
-        </p>
         <input
-          name="name"
-          type="text"
-          value="{{.Name}}"
-          required
-          placeholder="Your name"
-        />
+            name="name"
+            type="text"
+            value="{{.Name}}"
+            required
+            placeholder="Your name"
+            />
         <div class="inputWrapper">
           <input
-            name="email"
-            type="text"
-            value="{{.Email}}"
-            required
-            placeholder="Your email address"
-          />
+              name="email"
+              type="text"
+              value="{{.Email}}"
+              required
+              placeholder="Your email address"
+              />
           {{if .Error}}
           <div class="error">{{.Error}}</div>
-          {{end}} {{if .DuplicateURL}}
+          {{end}}
+
+          {{if .Duplicate}}
           <div class="error">
-            This email has already been used for creating a certificate:
-            <a href="{{.DuplicateURL}}">click here to see it</a>.
+            This email has already been used for creating a certificate
           </div>
           {{end}}
         </div>
@@ -60,36 +66,33 @@
       </form>
 
       <p
-        style="
-          font-size: 10px;
-          color: white;
-          max-width: 500px;
-          margin: 20px auto;
-        "
-      >
-        The email will not be displayed on the screen, just your name. The name
-        and email are used to fill in the "Subject" field of the X.509
-        certificate, and won't be used for anything else than printing the
-        certificate. The data submitted stays on the Pi, and will be removed
-        after 10 November 2022 (the printed QR code will still work).
+          style="
+                 font-size: 10px;
+                 color: white;
+                 max-width: 500px;
+                 margin: 20px auto;
+                 "
+          >
+          The email will not be displayed on the screen, just your name. The name
+          and email are used to fill in the "Subject" field of the X.509
+          certificate, and won't be used for anything else than printing the
+          certificate. The data submitted stays on the Pi, and will be removed
+          after 10 November 2022 (the printed QR code will still work).
       </p>
 
       <div class="push"></div>
     </div>
+
     <footer>
       <p>
-        Powered by
-        <a href="https://cert-manager.io" target="_blank">cert-manager.io</a>
+      Powered by <a href="https://cert-manager.io" target="_blank">cert-manager.io</a>
       </p>
       <p class="small">
-        Project proudly supported by
-        <a href="https://jetstack.io" target="_blank">jetstack.io</a>
+      Project proudly supported by
+      <a href="https://venafi.com" target="_blank">Venafi</a>
       </p>
       <p class="small">
-        Design by
-        <a href="https://constantinchirila.com" target="_blank"
-          >Constantin Chirila</a
-        >
+      Design by <a href="https://constantinchirila.com" target="_blank">Constantin Chirila</a>
       </p>
     </footer>
     {{if .Debug}}
