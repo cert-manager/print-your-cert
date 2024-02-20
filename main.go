@@ -291,7 +291,7 @@ func printPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) htt
 	})
 }
 
-func downloadCertPage(kclient kubernetes.Interface) http.Handler {
+func downloadCertPage(kclient kubernetes.Interface, ns string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			http.Error(w, fmt.Sprintf("Only the GET method is supported supported on the path %s.\n", r.URL.Path), http.StatusMethodNotAllowed)
@@ -301,7 +301,7 @@ func downloadCertPage(kclient kubernetes.Interface) http.Handler {
 		cert := CertFromContext(r.Context())
 		certName := cert.ObjectMeta.Name
 
-		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
+		secret, err := kclient.CoreV1().Secrets(ns).Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
 		if err != nil {
 			http.Error(w, "A certificate already exists, but the secret does not exist. Try again later.", 423)
 			log.Printf("GET /download: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, *namespace, cert.Spec.SecretName)
@@ -325,7 +325,7 @@ func downloadCertPage(kclient kubernetes.Interface) http.Handler {
 	})
 }
 
-func downloadPrivateKeyPage(kclient kubernetes.Interface) http.Handler {
+func downloadPrivateKeyPage(kclient kubernetes.Interface, ns string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			http.Error(w, fmt.Sprintf("Only the GET method is supported supported on the path %s.\n", r.URL.Path), http.StatusMethodNotAllowed)
@@ -335,7 +335,7 @@ func downloadPrivateKeyPage(kclient kubernetes.Interface) http.Handler {
 		cert := CertFromContext(r.Context())
 		certName := cert.ObjectMeta.Name
 
-		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
+		secret, err := kclient.CoreV1().Secrets(ns).Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
 		if err != nil {
 			http.Error(w, "A certificate already exists, but the secret does not exist. Try again later.", 423)
 			log.Printf("GET /download: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, *namespace, cert.Spec.SecretName)
@@ -359,7 +359,7 @@ func downloadPrivateKeyPage(kclient kubernetes.Interface) http.Handler {
 	})
 }
 
-func downloadTarPage(kclient kubernetes.Interface) http.Handler {
+func downloadTarPage(kclient kubernetes.Interface, ns string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			http.Error(w, fmt.Sprintf("Only the GET method is supported supported on the path %s.\n", r.URL.Path), http.StatusMethodNotAllowed)
@@ -369,7 +369,7 @@ func downloadTarPage(kclient kubernetes.Interface) http.Handler {
 		cert := CertFromContext(r.Context())
 		certName := cert.ObjectMeta.Name
 
-		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
+		secret, err := kclient.CoreV1().Secrets(ns).Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
 		if err != nil {
 			http.Error(w, "A certificate already exists, but the secret does not exist. Try again later.", 423)
 			log.Printf("GET /download: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, *namespace, cert.Spec.SecretName)
@@ -463,7 +463,7 @@ func parseNameAndEmail(cert *certmanagerv1.Certificate) (string, string, error) 
 // except that is also shows whether the certificate was printed or not.
 //
 //	GET /certificate?certName=abcdef123 HTTP/2.0
-func certificatePage(kclient kubernetes.Interface) http.Handler {
+func certificatePage(kclient kubernetes.Interface, ns string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/certificate" {
 			http.Error(w, fmt.Sprintf("The path %s contains is expected to be /.", r.URL.Path), http.StatusNotFound)
@@ -512,7 +512,7 @@ func certificatePage(kclient kubernetes.Interface) http.Handler {
 		}
 
 		// Let's show the user the Certificate.
-		secret, err := kclient.CoreV1().Secrets("default").Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
+		secret, err := kclient.CoreV1().Secrets(ns).Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
 		if err != nil {
 			w.WriteHeader(423)
 			err = tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Name: personName, Email: email, CertName: certName, FetchKey: fetchKey, Refresh: 5, Error: "A certificate already exists, but the Secret does not exist; the page will be reloaded in 5 seconds until this issue is resolved.", Debug: debugMsg})
@@ -906,10 +906,10 @@ func main() {
 	http.HandleFunc("/list", listPage(kclient, cmclient))
 
 	http.Handle("/print", certFetchMiddleware(cmclient, printPage(kclient, cmclient)))
-	http.Handle("/download", certFetchMiddleware(cmclient, downloadCertPage(kclient)))
-	http.Handle("/downloadpkey", certFetchMiddleware(cmclient, downloadPrivateKeyPage(kclient)))
-	http.Handle("/cert-manager-bundle.tar", certFetchMiddleware(cmclient, downloadTarPage(kclient)))
-	http.Handle("/certificate", certFetchMiddleware(cmclient, certificatePage(kclient)))
+	http.Handle("/download", certFetchMiddleware(cmclient, downloadCertPage(kclient, *namespace)))
+	http.Handle("/downloadpkey", certFetchMiddleware(cmclient, downloadPrivateKeyPage(kclient, *namespace)))
+	http.Handle("/cert-manager-bundle.tar", certFetchMiddleware(cmclient, downloadTarPage(kclient, *namespace)))
+	http.Handle("/certificate", certFetchMiddleware(cmclient, certificatePage(kclient, *namespace)))
 
 	fileserver := http.StripPrefix("/", http.FileServer(http.FS(static)))
 	http.Handle("/static/", cachingHeadersMiddleware(fileserver))
