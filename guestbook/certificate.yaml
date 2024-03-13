@@ -1,0 +1,28 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: guestbook-tls
+  namespace: cert-manager
+spec:
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  secretName: guestbook-tls
+  commonName: guestbook.print-your-cert.cert-manager.io
+  subject:
+    organizations:
+    - CNCF
+    organizationalUnits:
+    - cert-manager
+    countries:
+    - GB
+    - US
+    - FR
+    - ES
+    - NL
+  duration: 87600h # 10 years
+  dnsNames:
+  - guestbook.print-your-cert.cert-manager.io
+  issuerRef:
+    name: root-print-your-cert-ca-issuer
+    kind: Issuer

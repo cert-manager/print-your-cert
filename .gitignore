@@ -6,3 +6,5 @@ print-your-cert-front.tar
 *.tar
 *amd64
 *arm64
+guestbook/guestbook
+guestbook/guestbook.sqlite

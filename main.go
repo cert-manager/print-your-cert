@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/tls"
 	"crypto/x509"
 	"embed"
 	_ "embed"
@@ -19,12 +20,15 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"net/mail"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	apiutil "github.com/cert-manager/cert-manager/pkg/api/util"
@@ -46,6 +50,9 @@ var (
 	issuerKind  = flag.String("issuer-kind", "Issuer", "This flag can be used to select the namespaced 'Issuer', or to select an 'external' issuer, e.g., 'AWSPCAIssuer'.")
 	issuerGroup = flag.String("issuer-group", "cert-manager.io", "This flag allows you to give a different API group when using an 'external' issuer, e.g., 'awspca.cert-manager.io'.")
 	inCluster   = flag.Bool("in-cluster", false, "Use the in-cluster kube config to connect to Kubernetes. Use this flag when running in a pod.")
+
+	guestbookURL        = flag.String("guestbook-url", "https://guestbook.print-your-cert.cert-manager.io/write", "URL of the write path for the guestbook")
+	guestbookRootCAPath = flag.String("guestbook-ca", "guestbook/ca.crt", "Path to the CA certificate for the guestbook")
 )
 
 const (
@@ -199,6 +206,12 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 			Spec: certmanagerv1.CertificateSpec{
 				CommonName: commonName,
 				Duration:   &metav1.Duration{Duration: 3 * 3650 * 24 * time.Hour}, // 30 years.
+				Subject: &certmanagerv1.X509Subject{
+					// Update this with the country you're issuing in!
+					Countries: []string{
+						"FR",
+					},
+				},
 				SecretName: certName,
 				IssuerRef: cmmetav1.ObjectReference{
 					Name:  *issuer,
@@ -310,7 +323,7 @@ func downloadCertPage(kclient kubernetes.Interface, ns string) http.Handler {
 
 		certPem, ok := secret.Data["tls.crt"]
 		if !ok {
-			http.Error(w, "The Secret does not contain a certificate, try again later.", 423)
+			w.WriteHeader(423)
 			tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Error: "Internal issue with the stored certificate in Kubernetes."})
 			log.Printf("GET /download: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
 			return
@@ -344,7 +357,7 @@ func downloadPrivateKeyPage(kclient kubernetes.Interface, ns string) http.Handle
 
 		keyPEM, ok := secret.Data["tls.key"]
 		if !ok {
-			http.Error(w, "The Secret does not contain a private key, try again later.", 423)
+			w.WriteHeader(423)
 			tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Error: "Internal issue with the stored certificate in Kubernetes."})
 			log.Printf("GET /downloadpkey: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
 			return
@@ -378,7 +391,7 @@ func downloadTarPage(kclient kubernetes.Interface, ns string) http.Handler {
 
 		certPEM, ok := secret.Data["tls.crt"]
 		if !ok {
-			http.Error(w, "The Secret does not contain a certificate, try again later.", 423)
+			w.WriteHeader(423)
 			tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Error: "Internal issue with the stored certificate in Kubernetes."})
 			log.Printf("GET /download: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
 			return
@@ -386,7 +399,7 @@ func downloadTarPage(kclient kubernetes.Interface, ns string) http.Handler {
 
 		keyPEM, ok := secret.Data["tls.key"]
 		if !ok {
-			http.Error(w, "The Secret does not contain a private key, try again later.", 423)
+			w.WriteHeader(423)
 			tmpl.ExecuteTemplate(w, "certificate.html", certificatePageData{Error: "Internal issue with the stored certificate in Kubernetes."})
 			log.Printf("GET /downloadpkey: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, *namespace, cert.Spec.SecretName)
 			return
@@ -433,6 +446,103 @@ func downloadTarPage(kclient kubernetes.Interface, ns string) http.Handler {
 		w.Header().Set("Content-Disposition", `attachment; filename="cert-manager-bundle.tar"`)
 		w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
 		w.Write(buf.Bytes())
+	})
+}
+
+func signGuestbookPage(guestbookURL string, remoteRoots *x509.CertPool, kclient kubernetes.Interface, namespace string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, fmt.Sprintf("Only the GET method is supported supported on the path %s.\n", r.URL.Path), http.StatusMethodNotAllowed)
+			return
+		}
+
+		cert := CertFromContext(r.Context())
+		certName := cert.ObjectMeta.Name
+		fetchKey := FetchKeyFromContext(r.Context())
+
+		secret, err := kclient.CoreV1().Secrets(namespace).Get(r.Context(), cert.Spec.SecretName, metav1.GetOptions{})
+		if err != nil {
+			http.Error(w, "A certificate already exists, but the secret does not exist. Try again later.", 423)
+			log.Printf("POST /sign-guestbook: the requested certificate %s in namespace %s exists, but the Secret %s does not.", certName, namespace, cert.Spec.SecretName)
+			return
+		}
+
+		certPEM, ok := secret.Data["tls.crt"]
+		if !ok {
+			w.WriteHeader(423)
+			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Internal issue with the stored certificate in Kubernetes."})
+			log.Printf("POST /sign-guestbook: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, namespace, cert.Spec.SecretName)
+			return
+		}
+
+		keyPEM, ok := secret.Data["tls.key"]
+		if !ok {
+			w.WriteHeader(423)
+			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Internal issue with the stored certificate in Kubernetes."})
+			log.Printf("POST /sign-guestbook: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, namespace, cert.Spec.SecretName)
+			return
+		}
+
+		clientCertKeyPair, err := tls.X509KeyPair(certPEM, keyPEM)
+		if err != nil {
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Internal issue with the stored certificate in Kubernetes."})
+			log.Printf("POST /sign-guestbook: invalid certificate: %s", err)
+			return
+		}
+
+		guestbookClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					Certificates: []tls.Certificate{clientCertKeyPair},
+					RootCAs:      remoteRoots,
+				},
+			},
+			Timeout: 5 * time.Second,
+		}
+
+		postValues := url.Values{}
+		postValues.Add("message", "hello from the cert-manager kiosk")
+
+		req, err := http.NewRequestWithContext(r.Context(), "POST", guestbookURL, strings.NewReader(postValues.Encode()))
+		if err != nil {
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Internal issue with creating request for guestbook"})
+			log.Printf("POST /sign-guestbook: couldn't create request: %s", err)
+			return
+		}
+
+		req.Header.Add("content-type", "application/x-www-form-urlencoded")
+		req.Header.Add("user-agent", "kiosk")
+
+		guestbookResponse, err := guestbookClient.Do(req)
+		if err != nil {
+			// 503 might not be right but this is a demo, so we'll just use it unconditionally for simplicity
+			w.WriteHeader(503)
+			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Internal issue with creating request for guestbook"})
+			log.Printf("POST /sign-guestbook: couldn't make request: %s", err)
+			return
+		}
+
+		defer guestbookResponse.Body.Close()
+
+		if guestbookResponse.StatusCode != http.StatusOK {
+			body, err := io.ReadAll(guestbookResponse.Body)
+			if err != nil {
+				log.Println("failed to read error response body")
+			} else {
+				log.Printf("failed to sign guestbook: %s", string(body))
+			}
+		}
+
+		destQuery := url.Values{
+			"certName": []string{certName},
+			"fetchKey": []string{fetchKey},
+		}
+
+		destination := "/certificate?" + destQuery.Encode()
+		http.Redirect(w, r, destination, http.StatusFound)
+		tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Error: "Redirecting..."})
 	})
 }
 
@@ -902,6 +1012,21 @@ func main() {
 		log.Fatal(err)
 	}
 
+	remoteRoots, err := x509.SystemCertPool()
+	if err != nil {
+		log.Fatalf("failed to get system cert pool: %s", err)
+	}
+
+	if *guestbookRootCAPath != "" {
+		guestbookRoot, err := os.ReadFile(*guestbookRootCAPath)
+		if err != nil {
+			log.Fatalf("failed to read guestbook root CA from %q: %s", *guestbookRootCAPath, err)
+		}
+
+		log.Printf("loaded root CA from %s", *guestbookRootCAPath)
+		remoteRoots.AppendCertsFromPEM(guestbookRoot)
+	}
+
 	http.HandleFunc("/", landingPage(kclient, cmclient))
 	http.HandleFunc("/list", listPage(kclient, cmclient))
 
@@ -910,6 +1035,7 @@ func main() {
 	http.Handle("/downloadpkey", certFetchMiddleware(cmclient, downloadPrivateKeyPage(kclient, *namespace)))
 	http.Handle("/cert-manager-bundle.tar", certFetchMiddleware(cmclient, downloadTarPage(kclient, *namespace)))
 	http.Handle("/certificate", certFetchMiddleware(cmclient, certificatePage(kclient, *namespace)))
+	http.Handle("/sign-guestbook", certFetchMiddleware(cmclient, signGuestbookPage(*guestbookURL, remoteRoots, kclient, *namespace)))
 
 	fileserver := http.StripPrefix("/", http.FileServer(http.FS(static)))
 	http.Handle("/static/", cachingHeadersMiddleware(fileserver))
