@@ -1,0 +1,50 @@
+# This file creates a self-signed root certificate for dev purposes.
+#
+# For "production", we'd ideally want to use the same root certificate
+# for multiple different events and so the issuer would be based off of
+# a manually created Secret which holds the root.
+
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: self-signed
+  namespace: cert-manager
+spec:
+  selfSigned: {}
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: root-print-your-cert-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  secretName: root-print-your-cert-ca
+  commonName: The cert-manager maintainers Root CA
+  subject:
+    organizations:
+    - CNCF
+    organizationalUnits:
+    - cert-manager
+  duration: 876000h # 100 years.
+  issuerRef:
+    name: self-signed
+    kind: Issuer
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: root-print-your-cert-ca-issuer
+  namespace: cert-manager
+spec:
+  ca:
+    secretName: root-print-your-cert-ca
+
+

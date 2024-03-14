@@ -1,0 +1,16 @@
+# This file creates an issuer from a root certificate, assuming that
+# the root was provided in a secret manually.
+#
+# The secret should be called root-print-your-cert-ca and should be in the
+# cert-manager namespace
+
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: root-print-your-cert-ca-issuer
+  namespace: cert-manager
+spec:
+  ca:
+    secretName: root-print-your-cert-ca
+
+

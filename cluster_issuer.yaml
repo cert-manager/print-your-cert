@@ -1,47 +1,9 @@
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: self-signed
-  namespace: cert-manager
-spec:
-  selfSigned: {}
-
----
-
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: root-print-your-cert-ca
-  namespace: cert-manager
-spec:
-  isCA: true
-  privateKey:
-    algorithm: ECDSA
-    size: 256
-  secretName: root-print-your-cert-ca
-  commonName: The cert-manager maintainers Root CA
-  subject:
-    organizations:
-    - CNCF
-    organizationalUnits:
-    - cert-manager
-  duration: 876000h # 100 years.
-  issuerRef:
-    name: self-signed
-    kind: Issuer
-
----
-
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: root-print-your-cert-ca-issuer
-  namespace: cert-manager
-spec:
-  ca:
-    secretName: root-print-your-cert-ca
-
----
+# This file creates an intermediate cert for issuing client certificates,
+# and assumes that a root CA issuer has already been configured in the
+# cert-manager namespace
+#
+# See root_issuer_dev.yaml  for creating a dev root
+# See root_issuer_prod.yaml for creating a production root from a known secret
 
 apiVersion: cert-manager.io/v1
 kind: Certificate
