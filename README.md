@@ -18,9 +18,14 @@ work forever, the other URLs and IPs presented in this README are temporary.
 - [What's the stack?](#whats-the-stack)
 - [Staff: test things](#staff-test-things)
 - [Running everything on the Raspberry Pi (on the booth)](#running-everything-on-the-raspberry-pi-on-the-booth)
-  - [Booth: Initial set up of the Raspberry Pi](#booth-intial-set-up-of-the-raspberry-pi)
+  - [Booth: Initial set up of the Raspberry Pi](#booth-initial-set-up-of-the-raspberry-pi)
+  - [Booth: Set Up Tailscale on the Raspberry Pi](#booth-set-up-tailscale-on-the-raspberry-pi)
+  - [Booth: Make sure you can SSH into the Rasberry Pi](#booth-make-sure-you-can-ssh-into-the-rasberry-pi)
+  - [Booth: Set Up Docker, Helm, K3d, and kubectl](#booth-set-up-docker-helm-k3d-and-kubectl)
   - [Booth: Set up the tunnel between the Internet and the Raspberry Pi](#booth-set-up-the-tunnel-between-the-internet-and-the-raspberry-pi)
   - [Prerequisite: install k3s on the Raspberry Pi](#prerequisite-install-k3s-on-the-raspberry-pi)
+  - [Booth: Configure kubectl on your laptop to access the Raspberry Pi's cluster](#booth-configure-kubectl-on-your-laptop-to-access-the-raspberry-pis-cluster)
+  - [Booth: Install cert-manager and the issuers on the Raspberry Pi](#booth-install-cert-manager-and-the-issuers-on-the-raspberry-pi)
   - [Booth: Run the UI on the Raspberry Pi](#booth-run-the-ui-on-the-raspberry-pi)
   - [Booth: Running the printer controller on the Raspberry Pi](#booth-running-the-printer-controller-on-the-raspberry-pi)
 - [Local development](#local-development)
@@ -30,6 +35,7 @@ work forever, the other URLs and IPs presented in this README are temporary.
     - [Testing the printer](#testing-the-printer)
     - [Testing pem-to-png](#testing-pem-to-png)
 - [Troubleshooting](#troubleshooting)
+  - [From the CLI: `usb.core.USBError: [Errno 13] Access denied (insufficient permissions)`](#from-the-cli-usbcoreusberror-errno-13-access-denied-insufficient-permissions)
   - [From the CLI: `usb.core.USBError: [Errno 16] Resource busy`](#from-the-cli-usbcoreusberror-errno-16-resource-busy)
   - [From the web UI: `No such file or directory: '/dev/usb/lp1'`](#from-the-web-ui-no-such-file-or-directory-devusblp1)
 
@@ -107,7 +113,7 @@ configuration for the ECDSA signature is shown below in
 [print-your-cert-ca](#print-your-cert-ca). Also, I chose to have a very long
 expiry for both certificates since there is no security risk associated with
 leaking either of the private keys (since the private keys of both will be
-discarded on 21 May 2022 anyways).
+discarded on 23 March 2024 anyways).
 
 The QR code contains a URL of the form:
 
@@ -245,13 +251,18 @@ things:
 
 ## Running everything on the Raspberry Pi (on the booth)
 
-Once on the booth, you will need to perform these five tasks:
+Once on the booth, you will need to perform these ten tasks:
 
-1. [Booth: Intial set up of the Raspberry Pi](#booth-intial-set-up-of-the-raspberry-pi)
-2. [Booth: Set up the tunnel between the Internet and the Raspberry Pi](#booth-set-up-the-tunnel-between-the-internet-and-the-raspberry-pi)
-3. [Prerequisite: install k3s on the Raspberry Pi](#prerequisite-install-k3s-on-the-raspberry-pi)
-4. [Booth: Run the UI on the Raspberry Pi](#booth-run-the-ui-on-the-raspberry-pi)
-5. [Booth: Running the printer controller on the Raspberry Pi](#booth-running-the-printer-controller-on-the-raspberry-pi)
+1. [Booth: Initial set up of the Raspberry Pi](#booth-initial-set-up-of-the-raspberry-pi)
+1. [Booth: Set Up Tailscale on the Raspberry Pi](#booth-set-up-tailscale-on-the-raspberry-pi)
+1. [Booth: Make sure you can SSH into the Rasberry Pi](#booth-make-sure-you-can-ssh-into-the-rasberry-pi)
+1. [Booth: Set Up Docker, Helm, K3d, and kubectl](#booth-set-up-docker-helm-k3d-and-kubectl)
+1. [Booth: Set up the tunnel between the Internet and the Raspberry Pi](#booth-set-up-the-tunnel-between-the-internet-and-the-raspberry-pi)
+1. [Prerequisite: install k3s on the Raspberry Pi](#prerequisite-install-k3s-on-the-raspberry-pi)
+1. [Booth: Configure kubectl on your laptop to access the Raspberry Pi's cluster](#booth-configure-kubectl-on-your-laptop-to-access-the-raspberry-pis-cluster)
+1. [Booth: Install cert-manager and the issuers on the Raspberry Pi](#booth-install-cert-manager-and-the-issuers-on-the-raspberry-pi)
+1. [Booth: Run the UI on the Raspberry Pi](#booth-run-the-ui-on-the-raspberry-pi)
+1. [Booth: Running the printer controller on the Raspberry Pi](#booth-running-the-printer-controller-on-the-raspberry-pi)
 
 ### Booth: Initial set up of the Raspberry Pi
 
@@ -314,17 +325,94 @@ EOF
 > sudo ifconfig wlan0 up
 > ```
 
-### Booth: Set Up Docker, Helm, K3d, and kubectl
+Then, unmount the micro SD card from your laptop and plug it into the Raspberry.
 
-First, SSH into the Pi:
+### Booth: Set Up Tailscale on the Raspberry Pi
+
+Plug a keyboard and mouse to the Raspberry and install Tailscale:
 
 ```bash
-ssh pi@$(tailscale ip -4 pi)
+curl -fsSL https://tailscale.com/install.sh | sh
 ```
+
+Then, start the login process with:
+
+```sh
+tailscale up --accept-dns=false
+```
+
+> [!IMPORTANT]
+>
+> Make sure to disable Tailscale's DNS resolution with `--accept-dns=false`. We
+> have seen a ton of problems with Tailscale's DNS resolution.
+
+It will open a browser window, allowing you to log in. Use your GitHub account
+to log in (Sign In with GitHub -> Authorize Tailscale -> Single-user Tailnet).
+
+Then, share the device to the Tailnet `cert-manager.org.github` by going to
+<https://login.tailscale.com/admin/machines>, clicking on the machine
+print-your-cert, "Share...", copy the link, logout, log in using "Multi-user
+Tailnet", use the link to have the machine shared.
+
+Go back to your laptop and run the following command to make sure everyone in
+the cert-manager org can SSH into the Pi:
+
+```bash
+curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.com/orgs/cert-manager/members \
+  | jq '.[] | .login' -r \
+  | ssh -t pi@$(tailscale ip -4 pi) \
+    'set -xe; while read -r i; do curl -LsS https://github.com/$i.keys | tee -a $HOME/.ssh/authorized_keys; done; cat $HOME/.ssh/authorized_keys | sort | sed -re 's/\s+$//' | uniq >a; mv a $HOME/.ssh/authorized_keys'
+```
+
+### Booth: Make sure you can SSH into the Rasberry Pi
+
+First, make sure you have Tailscale installed and running. Make sure to be
+[login](https://login.tailscale.com/) using your GitHub account, and select the
+Tailnet "cert-manager.org.github". The Pi is shared to that Tailnet.
+
+Then, edit your `~/.ssh/config` to add the following:
+
+```text
+Host pi
+  HostName 100.85.65.38
+  User pi
+```
+
+All the commands below assume that you have configured your `~/.ssh/config` as
+above.
+
+### Booth: Set Up Docker, Helm, K3d, and kubectl
+
+Make sure you have configured `~/.ssh.config` in the section above. Then, SSH
+into the Pi:
+
+```bash
+ssh pi
+```
+
+> [!NOTE]
+>
+> You may see the following error message when SSHing into the Pi:
+>
+> ```text
+> bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+> ```
+>
+> To fix this, you can run the following command:
+>
+> ```sh
+> # From the Raspberry Pi.
+> sudo tee -a /etc/environment <<<"LC_ALL=en_US.UTF-8"
+> sudo tee /etc/locale.gen <<<"en_US.UTF-8 UTF-8"
+> sudo tee /etc/locale.conf <<<"LANG=en_US.UTF-8"
+> sudo locale-gen en_US.UTF-8
+> EOF
+> ```
 
 Then, install Docker with the command:
 
 ```bash
+# From the Raspberry Pi:
 curl -fsSL https://get.docker.com | sudo bash
 sudo groupadd docker
 sudo usermod -aG docker $USER
@@ -342,53 +430,18 @@ cgroup_memory=1 cgroup_enable=memory
 Also install `vim` and `jq`:
 
 ```bash
+# From the Raspberry Pi:
 sudo apt install -y vim jq
 ```
 
 Finally, install `k3d`, `helm`, and `kubectl`:
 
 ```bash
+# From the Raspberry Pi:
 curl -Ls https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
 curl -Ls https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-```
-
-Finally, install Tailscale:
-
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-```
-
-### Booth: Set Up Tailscale and SSH to the Pi
-
-> [!IMPORTANT]
->
-> Make sure to disable Tailscale's DNS resolution with `--accept-dns=false`. We
-> have seen a ton of problems with Tailscale's DNS resolution.
-
-To log into Tailscale, run the command:
-
-```sh
-tailscale up --accept-dns=false
-```
-
-It will open a browser window, allowing you to log in. Use your GitHub account
-to log in (Sign In with GitHub -> Authorize Tailscale -> Single-user Tailnet).
-
-Then, share the device to the Tailnet `cert-manager@github` by going to
-<https://login.tailscale.com/admin/machines>, clicking on the machine
-print-your-cert, "Share...", copy the link, logout, log in using "Multi-user
-Tailnet", use the link to have the machine shared.
-
-Go back to your laptop and run the following command to make sure everyone in
-the cert-manager org can SSH into the Pi:
-
-```bash
-curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.com/orgs/cert-manager/members \
-  | jq '.[] | .login' -r \
-  | ssh -t pi@$(tailscale ip -4 pi) \
-    'set -xe; while read -r i; do curl -LsS https://github.com/$i.keys | tee -a $HOME/.ssh/authorized_keys; done; cat $HOME/.ssh/authorized_keys | sort | sed -re 's/\s+$//' | uniq >a; mv a $HOME/.ssh/authorized_keys'
 ```
 
 ### Booth: Set up the tunnel between the Internet and the Raspberry Pi
@@ -431,6 +484,7 @@ To create the VM `print-your-cert`, you can use the following command:
 > use `us-central1-c` (Iowa) since the venue was in Chicago.
 
 ```shell
+# From your laptop:
 gcloud compute firewall-rules create allow-tailscale \
     --project jetstack-mael-valais \
     --network default \
@@ -453,7 +507,7 @@ Then, copy-paste the IP into the print-your-cert.cert-manager.io zone:
 
 1. Copy the IP:
 
-   ```sh
+   ```bash
    IP=$(gcloud compute instances describe print-your-cert \
        --project jetstack-mael-valais \
        --zone=us-central1-c --format json \
@@ -461,7 +515,7 @@ Then, copy-paste the IP into the print-your-cert.cert-manager.io zone:
    ```
 
 2. The zone `print-your-cert.cert-manager.io` is a delegated zone meant for print-your-cert.
-   Anyone in the Google group team-cert-manager@jetstack.io can update the `A` record:
+   Anyone in the Google group <team-cert-manager@jetstack.io> can update the `A` record:
 
    ```bash
    gcloud dns record-sets update --project cert-manager-io \
@@ -527,44 +581,38 @@ The first step is to create a cluster with a cert-manager issuer:
 <a id="print-your-cert-ca"></a>
 
 ```sh
-k3d cluster create
+# From the Raspberry Pi:
+k3d cluster create --k3s-arg="--tls-san=$(tailscale ip -4)@server:*"
+```
+
+### Booth: Configure kubectl on your laptop to access the Raspberry Pi's cluster
+
+First, make sure you can SSH to the Raspberry Pi over Tailscale in one of the
+above sections.
+
+Then, run the following:
+
+```sh
+ssh pi 'k3d kubeconfig get -a | sed "s/0.0.0.0/$(tailscale ip -4)/g"' >/tmp/kc \
+  && KUBECONFIG=/tmp/kc:$HOME/.kube/config k config view --flatten >kc \
+  && mv kc ~/.kube/config
+```
+
+### Booth: Install cert-manager and the issuers on the Raspberry Pi
+
+Install cert-manager:
+
+```sh
+# From the Raspberry Pi:
 helm repo add jetstack https://charts.jetstack.io --force-update
 helm upgrade --install cert-manager jetstack/cert-manager --namespace cert-manager --set installCRDs=true --create-namespace
-kubectl apply -f- <<EOF
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: self-signed
-  namespace: cert-manager
-spec:
-  selfSigned: {}
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: print-your-cert-ca
-  namespace: cert-manager
-spec:
-  isCA: true
-  privateKey:
-    algorithm: ECDSA
-    size: 256
-  secretName: print-your-cert-ca
-  commonName: The cert-manager maintainers
-  duration: 262800h # 30 years.
-  issuerRef:
-    name: self-signed
-    kind: Issuer
----
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: print-your-cert-ca
-  namespace: cert-manager
-spec:
-  ca:
-    secretName: print-your-cert-ca
-EOF
+```
+
+Finally, set up the ClusterIssuer:
+
+```sh
+# From the Raspberry Pi:
+kubectl apply -f cluster_issuer.yaml
 ```
 
 ### Booth: Run the UI on the Raspberry Pi
@@ -573,20 +621,41 @@ The UI doesn't run in Kubernetes (just because...). It runs as a container. It
 is a simple Go binary that serves an HTML site. Its container image name is
 `ghcr.io/cert-manager/print-your-cert-ui:latest`.
 
-```sh
-GOARCH=arm64 GOOS=linux go build -o print-your-cert-ui-arm64 .
-docker buildx build -f Dockerfile.ui --platform linux/arm64/v8 -t ghcr.io/cert-manager/print-your-cert-ui:latest -o type=docker,dest=print-your-cert-ui.tar . && ssh pi@$(tailscale ip -4 pi) docker load <print-your-cert-ui.tar
-```
+The following command will build the image on your laptop (faster than on the
+Pi) and then load the image on the Pi:
 
-> [!NOTE]
-> We don't actually push the image to GHCR. We just load it directly to the Raspberry Pi.
+```sh
+# From your laptop:
+KO_DOCKER_REPO=ghcr.io/cert-manager/print-your-cert-ui ko build . --platform linux/arm64 --tarball print-your-cert-ui.tar --push=false --bare
+ssh pi docker load <print-your-cert-ui.tar
+```
 
 Now, ssh into the Raspberry Pi and launch the UI:
 
 ```sh
-ssh pi@$(tailscale ip -4 pi)
-docker run -d --restart=always --name print-your-cert-ui --net=host -v $HOME/.kube/config:/root/.kube/config ghcr.io/cert-manager/print-your-cert-ui:latest --issuer print-your-cert-ca --issuer-kind ClusterIssuer --listen 0.0.0.0:8080
+# From your laptop.
+ssh pi docker rm -f print-your-cert-ui
+ssh pi 'kubectl get secret -n cert-manager root-print-your-cert-ca --template="{{index .data \"tls.crt\" | base64decode}}" | tee ca.crt'
+ssh pi docker run -d --restart=always --name print-your-cert-ui --net=host -v '/home/pi/.kube/config:/home/nonroot/.kube/config' -v '/home/pi/ca.crt:/home/nonroot/ca.crt' ghcr.io/cert-manager/print-your-cert-ui:latest --issuer print-your-cert-ca --issuer-kind ClusterIssuer --listen 0.0.0.0:8080 --guestbook-ca /home/nonroot/ca.crt
 ```
+
+> [!NOTE]
+>
+> We don't actually push the image to GHCR. We just load it directly to the Raspberry Pi.
+
+> [!NOTE]
+>
+> Why not skip buildx and use `ko` instead? That's because the base images that
+> `ko` relies on don't support the Rasberry Pi's `arm64/v8` architecture:
+>
+> ```console
+> $ crane manifest cgr.dev/chainguard/static | jq -r '.manifests[].platform | "\(.os)/\(.architecture)"'
+> linux/amd64
+> linux/arm
+> linux/arm64
+> linux/ppc64le
+> linux/s390x
+> ```
 
 ### Booth: Running the printer controller on the Raspberry Pi
 
@@ -599,39 +668,59 @@ Make sure that the k3s cluster is running that cert-manager is installed. If
 not, follow the section [Prerequisite: install k3s on the Raspberry
 Pi](#prerequisite-install-k3s-on-the-raspberry-pi).
 
-You may need to install Qemu if you are on Linux. Then, create a buildx builder:
+You may need to install Qemu if you are on Linux:
 
 ```bash
-# This "apt install" is not needed on M1 macs if you use Colima.
+# From your laptop, only on Linux:
 sudo apt install -y qemu qemu-user-static
-docker buildx create --name mybuilder
-docker buildx use mybuilder
-docker buildx inspect --bootstrap
 ```
+
+Then, create a buildx builder:
+
+```bash
+docker buildx create --name mybuilder --use
+```
+
+> [!NOTE]
+>
+> If it says "docker: 'buildx' is not a docker command", you may need to install
+> `buildx` manually. On macOS, you can do it with the following command:
+>
+> ```bash
+> brew install docker-buildx
+> mkdir -p ~/.docker/cli-plugins/
+> ln -sfn $(brew --prefix)/opt/docker-buildx/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx
+> ```
 
 Then, build the image on your desktop (faster than on the Pi) and then push it
 to the Pi.
 
 ```sh
-docker buildx build -f Dockerfile.controller --platform linux/arm64/v8 -t ghcr.io/cert-manager/print-your-cert-controller:latest -o type=docker,dest=print-your-cert-controller.tar . && ssh pi@$(tailscale ip -4 pi) docker load <print-your-cert-controller.tar
+# From your laptop:
+docker buildx build -f Dockerfile.controller --platform linux/arm64 \
+  -t ghcr.io/cert-manager/print-your-cert-controller:latest \
+  -o type=docker,dest=print-your-cert-controller.tar .
+ssh pi docker load <print-your-cert-controller.tar
 ```
 
 > [!NOTE]
-> We don't actually push the image to GHCR. We just load it directly
-> on the Pi.
+>
+> We don't push the image to GHCR. We just load it directly on the Pi.
 
-Now, ssh into the Raspberry Pi and launch the controller:
+Now, SSH into the Raspberry Pi and launch the controller:
 
 ```sh
-ssh pi@$(tailscale ip -4 pi)
-docker run -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb -v $HOME/.kube/config:/root/.kube/config --net=host ghcr.io/cert-manager/print-your-cert-controller:latest
+ssh pi docker rm -f print-your-cert-controller
+ssh pi docker run -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb -v /home/pi/.kube/config:/root/.kube/config --net=host ghcr.io/cert-manager/print-your-cert-controller:latest
 ```
 
 You can also run the "debug" printer UI (brother_ql_web) if you want to make
 sure that the printer works:
 
 ```sh
-docker run -d --restart=always --name brother_ql_web --privileged -v /dev/bus/usb:/dev/bus/usb -p 0.0.0.0:8013:8013 ghcr.io/cert-manager/print-your-cert-controller:latest brother_ql_web
+ssh pi docker run -d --restart=always --name brother_ql_web \
+  --privileged -v /dev/bus/usb:/dev/bus/usb \
+  -p 0.0.0.0:8013:8013 ghcr.io/cert-manager/print-your-cert-controller:latest brother_ql_web
 ```
 
 ## Local development
@@ -647,41 +736,7 @@ local machine (it is the same as for the Raspberry Pi).
 Then, you will need to create a ClusterIssuer:
 
 ```sh
-kubectl apply -f- <<EOF
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: self-signed
-  namespace: cert-manager
-spec:
-  selfSigned: {}
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: print-your-cert-ca
-  namespace: cert-manager
-spec:
-  isCA: true
-  privateKey:
-    algorithm: ECDSA
-    size: 256
-  secretName: print-your-cert-ca
-  commonName: The cert-manager maintainers
-  duration: 262800h # 30 years.
-  issuerRef:
-    name: self-signed
-    kind: Issuer
----
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: print-your-cert-ca
-  namespace: cert-manager
-spec:
-  ca:
-    secretName: print-your-cert-ca
-EOF
+kubectl apply -f cluster_issuer.yaml
 ```
 
 Then, you can run the UI:
@@ -751,11 +806,31 @@ brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 pem-
 
 ## Troubleshooting
 
+### From the CLI: `usb.core.USBError: [Errno 13] Access denied (insufficient permissions)`
+
+Run:
+
+```bash
+# From the Raspberry Pi.
+sudo tee /etc/udev/rules.d/99-brother-ql.rules <<EOF
+SUBSYSTEM=="usb", ATTR{idVendor}=="04f9", ATTR{idProduct}=="209d", MODE="0666"
+EOF
+```
+
+Then, reload the udev rules:
+
+```bash
+# From the Raspberry Pi.
+sudo udevadm trigger
+```
+
+Then, unplug and replug the printer.
+
 ### From the CLI: `usb.core.USBError: [Errno 16] Resource busy`
 
 On the Pi (over SSH), when running `brother_ql` with the following command:
 
-```text
+```bash
 docker run --privileged -v /dev/bus/usb:/dev/bus/usb -it --rm ghcr.io/cert-manager/print-your-cert-ui:latest brother_ql
 ```
 
