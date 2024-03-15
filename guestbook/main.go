@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"golang.org/x/crypto/acme/autocert"
 	_ "modernc.org/sqlite"
 )
 
@@ -27,6 +29,11 @@ var (
 	caCertPath     = flag.String("ca-cert", "", "Path to CA certs to trust for client certs")
 	chainPath      = flag.String("tls-chain", "", "Path to TLS cert chain")
 	privateKeyPath = flag.String("tls-key", "", "Path to TLS private key")
+
+	readOnlyDomain         = flag.String("readonly-domain", "", "Domain used to access the guestbook in read-only mode")
+	readOnlyListenSecure   = flag.String("readonly-listen", "0.0.0.0:443", "Address and port to listen on. Only useful if -prod is set.")
+	readOnlyListenInsecure = flag.String("readonly-listen-insecure", "0.0.0.0:8080", "Address and port to listen on. Must be 80 if -prod is set.")
+	readOnlyProd           = flag.Bool("prod", false, "If true, enables HTTPS for the readonly domain using Let's Encrypt.")
 
 	dbPath = flag.String("db-path", "guestbook.sqlite", "Path to sqlite database")
 	initDB = flag.Bool("init-db", false, "If set, initialise a fresh database at db-path")
@@ -242,14 +249,13 @@ func run(ctx context.Context) error {
 	}
 
 	serveMux := http.NewServeMux()
-
 	serveMux.Handle("GET /", certExtractMiddleware(indexPage(db)))
 	serveMux.Handle("POST /write", certExtractMiddleware(writePage(db)))
 
 	server := &http.Server{
 		Handler:     serveMux,
 		BaseContext: func(_ net.Listener) context.Context { return ctx },
-		ErrorLog:    slog.NewLogLogger(logger.With("handler", "http.Server").Handler(), slog.LevelError),
+		ErrorLog:    slog.NewLogLogger(logger.With("handler", "http.Server", "server", "write-server").Handler(), slog.LevelError),
 	}
 
 	listener, err := net.Listen("tcp", *listen)
@@ -278,12 +284,79 @@ func run(ctx context.Context) error {
 		}
 	}()
 
+	readOnlyMux := http.NewServeMux()
+	readOnlyMux.Handle("GET /", indexPage(db))
+	var m *autocert.Manager
+	var readOnlyHTTPS *http.Server
+	// When testing locally it doesn't make sense to start HTTPS server, so only
+	// do it in production.
+	if *readOnlyProd {
+		if !strings.HasSuffix(*readOnlyListenInsecure, ":80") {
+			return fmt.Errorf("with -prod, use -readonly-listen-insecure=:80 so that Let's Encrypt can verify the domain")
+		}
+
+		m = &autocert.Manager{
+			Prompt: autocert.AcceptTOS,
+			HostPolicy: func(ctx context.Context, host string) error {
+				allowedHost := *readOnlyDomain
+				if host == allowedHost {
+					return nil
+				}
+				return fmt.Errorf("acme/autocert: only %s host is allowed", allowedHost)
+			},
+			Cache: autocert.DirCache("."),
+		}
+
+		readOnlyHTTPS = &http.Server{
+			Handler:     readOnlyMux,
+			BaseContext: func(_ net.Listener) context.Context { return ctx },
+			ErrorLog:    slog.NewLogLogger(logger.With("handler", "http.Server", "server", "readonly-server-https").Handler(), slog.LevelError),
+			TLSConfig:   &tls.Config{GetCertificate: m.GetCertificate},
+			Addr:        *readOnlyListenSecure,
+		}
+
+		go func() {
+			logger.Info("readonly secure listening", "address", *readOnlyListenSecure)
+			err := readOnlyHTTPS.ListenAndServeTLS("", "")
+			if err != nil {
+				log.Fatalf("httpsSrv.ListendAndServeTLS() failed with %s", err)
+			}
+		}()
+	}
+	readOnlyHTTP := &http.Server{
+		Handler:     readOnlyMux,
+		BaseContext: func(_ net.Listener) context.Context { return ctx },
+		ErrorLog:    slog.NewLogLogger(logger.With("handler", "http.Server", "server", "readonly-server-http").Handler(), slog.LevelError),
+		Addr:        *readOnlyListenInsecure,
+	}
+	if m != nil {
+		// Allows autocert handle Let's Encrypt auth callbacks over HTTP.
+		readOnlyHTTP.Handler = m.HTTPHandler(readOnlyHTTP.Handler)
+	}
+	go func() {
+		logger.Info("readonly insecure listening", "address", *readOnlyListenInsecure)
+		err := readOnlyHTTP.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			logger.Info("failed to listen", "error", err)
+		}
+	}()
+
 	<-sigs
 	logger.Info("shutting down")
 
 	err = server.Shutdown(context.Background())
 	if err != nil {
 		return err
+	}
+	err = readOnlyHTTP.Shutdown(context.Background())
+	if err != nil {
+		return err
+	}
+	if readOnlyHTTPS != nil {
+		err = readOnlyHTTPS.Shutdown(context.Background())
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
