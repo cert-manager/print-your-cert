@@ -32,14 +32,17 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
         ;;
     true,*,)
         printf "%s: certificate has the annotation, let's set the 'Printed' condition to 'False' until it is printed.\n" "$(jq -r .metadata.name <<<"$cert")"
-        if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
-            -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
-            -d '[{"op": "add", "path": "/status/conditions", "value":[{
-                "type": "Printed",
-                "status": "False",
-                "reason": "Pending",
-                "message": "The print-your-cert-controller has acknowledged this certificate, and will print it shortly."
-            }]}]' 2>&1); then
+        if ! out=$(
+            kubectl patch cert "$(jq -r .metadata.name <<<"$cert")" --subresource status --type=json -p '
+            [{
+                "op": "add", "path": "/status/conditions", "value":[{
+                    "type": "Printed",
+                    "status": "False",
+                    "reason": "Pending",
+                    "message": "The print-your-cert-controller has acknowledged this certificate, and will print it shortly."
+                }]
+            }]' 2>&1
+        ); then
             printf "%s: failed to set the 'Printed' condition to 'False': %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
         fi
         continue
@@ -56,58 +59,60 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
 
         printf "%s: printing.\n" "$(jq -r .metadata.name <<<"$cert")"
 
-        if ! out=$(cert-card $certname $annotation_value_fetchkey <<<"$pem" 2>&1); then
+        if ! out=$(cert-card "$certname" "$annotation_value_fetchkey" <<<"$pem" 2>&1); then
             printf "%s: failed to generate front-....png and back-....png.\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
             continue
         fi
 
-		out=
-		brother_rc=
+        out=
+        brother_rc=
 
-		if [[ -n $mock ]]; then
-			out="mocked output for front print"
-			brother_rc=0
-		else
-			out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 front-$certname.png 2>&1)
-			brother_rc=$?
-		fi
+        if [[ -n $mock ]]; then
+            out="mocked output for front print"
+            brother_rc=0
+        else
+            out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 "front-$certname.png" 2>&1)
+            brother_rc=$?
+        fi
 
-        if [[ $brother_rc != 0 ]] ; then
+        if [[ $brother_rc != 0 ]]; then
             printf "%s: failed to print front-$certname.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
-            if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
-                -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
-                -d '[{"op": "add", "path": "/status/conditions", "value":[{
-                "type": "Printed",
-                "status": "False",
-                "reason": "Error",
-                "message": "brother_ql: '"$(tail -1 <<<"$out")"'"
-            }]}]' 2>&1); then
+            if ! out=$(kubectl patch cert "$(jq -r .metadata.name <<<"$cert")" --subresource status --type=json -p '
+            [{
+                "op": "add", "path": "/status/conditions", "value":[{
+                    "type": "Printed",
+                    "status": "False",
+                    "reason": "Error",
+                    "message": "brother_ql: '"$(tail -1 <<<"$out")"'"
+                }]
+            }]' 2>&1); then
                 printf "%s: failed to set the 'Printed' condition to 'False': %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
             fi
             continue
         fi
 
-		out=
-		brother_rc=
+        out=
+        brother_rc=
 
-		if [[ -n $mock ]]; then
-			out="mocked output for front print"
-			brother_rc=0
-		else
-			out=out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back-$certname.png 2>&1)
-			brother_rc=$?
-		fi
+        if [[ -n $mock ]]; then
+            out="mocked output for front print"
+            brother_rc=0
+        else
+            out=out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back-$certname.png 2>&1)
+            brother_rc=$?
+        fi
 
-        if [[ $brother_rc != 0 ]] ; then
+        if [[ $brother_rc != 0 ]]; then
             printf "%s: failed to print back-$certname.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
-            if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
-                -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
-                -d '[{"op": "add", "path": "/status/conditions", "value":[{
-                "type": "Printed",
-                "status": "False",
-                "reason": "Error",
-                "message": "brother_ql: '"$(tail -1 <<<"$out")"'"
-            }]}]' 2>&1); then
+            if ! out=$(kubectl patch cert "$(jq -r .metadata.name <<<"$cert")" --subresource status --type=json -p '
+            [{
+                "op": "add", "path": "/status/conditions", "value":[{
+                    "type": "Printed",
+                    "status": "False",
+                    "reason": "Error",
+                    "message": "brother_ql: '"$(tail -1 <<<"$out")"'"
+                }]
+            }]' 2>&1); then
                 printf "%s: failed to set the 'Printed' condition to 'False': %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
             fi
             continue
@@ -115,9 +120,11 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
 
         # Now that the certificate is printed, we can update the status of
         # the certificate.
-        if ! out=$(kubectl curl --fail -sS -k -H "Content-Type: application/json-patch+json" \
-            -X PATCH http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/"$(jq -r .metadata.name <<<"$cert")"/status \
-            -d '[{"op": "add", "path": "/status/conditions", "value":[{"type": "Printed", "status": "True"}]}]' 2>&1); then
+        if ! out=$(kubectl patch cert "$(jq -r .metadata.name <<<"$cert")" --subresource status --type=json -p '
+        [{
+            "op": "add", "path": "/status/conditions",
+            "value":[{"type": "Printed", "status": "True"}]
+        }]' 2>&1); then
             printf "%s: failed to generate front-....png and back-....png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
         fi
 
