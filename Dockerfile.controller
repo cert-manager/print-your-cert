@@ -13,7 +13,7 @@ RUN echo "@testing http://dl-cdn.alpinelinux.org/alpine/edge/testing" | tee -a /
     && chmod +x /usr/local/bin/brother_ql_web
 
 COPY config.json *.png /root/
-COPY pem-to-png print-your-cert-controller kubectl-curl /usr/local/bin/
+COPY cert-card print-your-cert-controller kubectl-curl /usr/local/bin/
 
 EXPOSE 8013
 
