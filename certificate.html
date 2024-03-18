@@ -67,7 +67,26 @@
           </form>
 
           <br />
+
+          <div class="divider"></div>
           {{end}}
+
+          <form method="POST" action="/sign-guestbook">
+            <p>
+            Signing is much more fun using your certificate! <br />
+
+            The tarball download contains instructions. <br />
+
+            Signing with your cert will gain you a special badge on the guestbook! <br />
+            </p>
+            <input name="certName" type="text" value="{{.CertName}}" hidden />
+            <input name="fetchKey" type="text" value="{{.FetchKey}}" hidden />
+            <button type="submit" class="constrain">
+              Sign the Guestbook!
+            </button>
+          </form>
+
+          <div class="divider"></div>
 
           <form method="GET" action="/cert-manager-bundle.tar">
             <input name="certName" type="text" value="{{.CertName}}" hidden />

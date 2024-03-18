@@ -22,12 +22,8 @@ spec:
     - CNCF
     organizationalUnits:
     - cert-manager
-    countries:
-    - GB
-    - US
+    countries: # Change for the country you're issuing in!
     - FR
-    - ES
-    - NL
   duration: 438000h # 50 years.
   issuerRef:
     name: root-print-your-cert-ca-issuer

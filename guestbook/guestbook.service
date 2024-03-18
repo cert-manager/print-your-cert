@@ -1,0 +1,16 @@
+[Unit]
+Description=cert-manager Booth Guestbook
+After=network.target
+
+[Service]
+# TODO: Add custom user
+# User=guestbook
+# Group=guestbook
+ExecStart=/usr/bin/guestbook -ca-cert /var/guestbook/ca.crt -tls-chain /etc/ssl/tls.chain -tls-key /etc/ssl/tls.key -db-path /var/guestbook/guestbook.sqlite
+StandardOutput=journal
+StandardError=journal
+Type=simple
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+dbs:
+- path: /var/guestbook/guestbook.sqlite
+  replicas:
+  - url: gcs://cert-manager-booth-bucket/guestbook.sqlite
