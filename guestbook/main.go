@@ -34,6 +34,7 @@ var (
 	readOnlyListenSecure   = flag.String("readonly-listen", "0.0.0.0:443", "Address and port to listen on. Only useful if -prod is set.")
 	readOnlyListenInsecure = flag.String("readonly-listen-insecure", "0.0.0.0:8080", "Address and port to listen on. Must be 80 if -prod is set.")
 	readOnlyProd           = flag.Bool("prod", false, "If true, enables HTTPS for the readonly domain using Let's Encrypt.")
+	readOnlyAutocertDir    = flag.String("autocert-dir", ".", "The directory used to cache the certificate and temporary files to work with Let's Encrypt.")
 
 	dbPath = flag.String("db-path", "guestbook.sqlite", "Path to sqlite database")
 	initDB = flag.Bool("init-db", false, "If set, initialise a fresh database at db-path")
@@ -304,7 +305,7 @@ func run(ctx context.Context) error {
 				}
 				return fmt.Errorf("acme/autocert: only %s host is allowed", allowedHost)
 			},
-			Cache: autocert.DirCache("."),
+			Cache: autocert.DirCache(*readOnlyAutocertDir),
 		}
 
 		readOnlyHTTPS = &http.Server{
