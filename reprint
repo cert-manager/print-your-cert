@@ -1,28 +1,42 @@
 #! /bin/bash
+set -euo pipefail
 
-#
 help() {
 	cat <<EOF
 We have seen cases where we needed to manually re-trigger the printing of the
-labels. Since re-printing requires removing the Printed=True condition, we
-have to use curl since kubectl doesnt support updating the status
-subresource.
+labels. What it does to re-print is remove the Printed=True condition.
 
 This command uses the namespace "default", and currently doesn't support
 changing to a different namespace.
 
 Usage:
-  $(basename "$0") <cert-name>
-
+  $(basename "$0") <email | certname>
+  $(basename "$0") mael@vls.dev
+  $(basename "$0") 7db51dbcac48ed00883c89fab7e1f62613b5a547d278c957211b219f385dee25
 EOF
-
-	set -euo pipefail
-
-	if ! [ $# -eq 1 ]; then
-		printf "error: you need to give the name of a certificate as argument.\n" >&2
-	fi
-	name=$1
-
-	./kubectl-curl --fail -sS -k -d '[{ "op": "replace", "path":"/status/conditions", "value": [] }]' -H "Content-Type: application/json-patch+json" -X PATCH "http://localhost/apis/cert-manager.io/v1/namespaces/default/certificates/$name/status" | jq
-
 }
+
+if ! [ $# -eq 1 ]; then
+	printf "error: you need to give an email or a Certificate name as argument.\n" >&2
+fi
+emailOrName=$1
+
+certName=
+if [[ $emailOrName == *@* ]]; then
+	certName=$(
+		kubectl get secret -ojson \
+			| jq -r ".items[].metadata | select(.annotations.\"cert-manager.io/email-sans\" == \"$emailOrName\").name"
+	)
+	if [[ -z $certName ]]; then
+		echo "No certificate found with the subject alternative email '$certName'"
+		exit 1
+	fi
+else
+	certName=$(kubectl get cert "$emailOrName" -oname | cut -d/ -f2)
+	if [[ -z $certName ]]; then
+		echo "Certificate $emailOrName not found"
+		exit 1
+	fi
+fi
+
+kubectl patch cert "$certName" --subresource status --type=json -p '[{"op":"replace","path":"/status/conditions","value":[{"type":"Printed","status":"False"}]}]'
