@@ -3,10 +3,21 @@
 
 set -eu -o pipefail
 
+CM_VERSION=${CM_VERSION:-v1.14.4}
+
+#kind load docker-image --name printyourcert quay.io/jetstack/cert-manager-controller:$CM_VERSION
+#kind load docker-image --name printyourcert quay.io/jetstack/cert-manager-cainjector:$CM_VERSION
+#kind load docker-image --name printyourcert quay.io/jetstack/cert-manager-ctl:$CM_VERSION
+#kind load docker-image --name printyourcert quay.io/jetstack/cert-manager-webhook:$CM_VERSION
+#helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --version $CM_VERSION --set installCRDs=true
+
 helm repo add jetstack https://charts.jetstack.io --force-update
-helm upgrade --install cert-manager --namespace cert-manager jetstack/cert-manager --set installCRDs=true --create-namespace
+helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --version $CM_VERSION --set installCRDs=true
 
 kubectl apply -f root_issuer_dev.yaml --wait
+#kubectl apply -f root-print-your-cert-ca.yaml
+#kubectl apply -f root_issuer_prod.yaml
+
 kubectl apply -f cluster_issuer.yaml --wait
 
 kubectl apply -f guestbook/certificate.yaml --wait

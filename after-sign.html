@@ -9,13 +9,13 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="static/styles.css" />
-    <meta http-equiv="refresh" content="2;URL=/certificate?certName={{.CertName}}&fetchKey={{.FetchKey}}">
+    <!--<meta http-equiv="refresh" content="2;URL=/certificate?certName={{.CertName}}&fetchKey={{.FetchKey}}">-->
   </head>
 
   <body>
     <div class="wrapper">
       <img src="static/images/logo.svg" alt="Logo" width="220" height="191" />
-      <h1>Printing your certificate</h1>
+      <h1>Signing the Guestbook</h1>
 
       <div class="divider"></div>
 
@@ -24,8 +24,10 @@
       {{end}}
 
       {{if .CertName}}
-      <div class="success">
-      <p style="color: seagreen">Your certificate should now get printed! Redirecting to your certificate in 2 seconds...</p>
+      <div>
+        <p>You signed the guestbook! Thanks for taking part in the cert-manager booth demo!</p>
+        <p>Note that you get a bonus star in the guestbook if you sign manually using your cert.</p>
+        <p>You can download your certificate and private key using the QR code on your printed cert.</p>
       </div>
 
       <div class="divider"></div>
