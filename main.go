@@ -292,14 +292,14 @@ func printPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) htt
 		_, err := cmclient.CertmanagerV1().Certificates(*namespace).Update(r.Context(), cert, metav1.UpdateOptions{})
 		if err != nil {
 			w.WriteHeader(500)
-			tmpl.ExecuteTemplate(w, "after-print.html", printPageData{CertName: certName, Error: "Could not trigger the print of the certificate. Please go to the previous page and press the button again."})
+			tmpl.ExecuteTemplate(w, "after-print.html", afterEventPageData{CertName: certName, FetchKey: fetchKey, Error: "Could not trigger certificate printing. Please go to the previous page and press the button again."})
 			log.Printf("POST /: could not trigger the print of the certificate %s in namespace %s: %v", certName, *namespace, err)
 			return
 		}
 
 		// Done!
 		w.WriteHeader(200)
-		tmpl.ExecuteTemplate(w, "after-print.html", printPageData{CertName: certName, FetchKey: fetchKey})
+		tmpl.ExecuteTemplate(w, "after-print.html", afterEventPageData{CertName: certName, FetchKey: fetchKey})
 		log.Printf("POST /: the certificate %s in namespace %s was added the annotation print:true", certName, *namespace)
 	})
 }
@@ -535,14 +535,11 @@ func signGuestbookPage(guestbookURL string, remoteRoots *x509.CertPool, kclient 
 			}
 		}
 
-		destQuery := url.Values{
-			"certName": []string{certName},
-			"fetchKey": []string{fetchKey},
-		}
-
-		destination := "/certificate?" + destQuery.Encode()
-		http.Redirect(w, r, destination, http.StatusFound)
-		tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Error: "Redirecting..."})
+		w.WriteHeader(200)
+		tmpl.ExecuteTemplate(w, "after-sign.html", afterEventPageData{
+			CertName: certName,
+			FetchKey: fetchKey,
+		})
 	})
 }
 
@@ -802,7 +799,7 @@ type landingPageData struct {
 	Duplicate         bool
 }
 
-type printPageData struct {
+type afterEventPageData struct {
 	CertName string // Mandatory.
 	FetchKey string // Mandatory.
 	Error    string // Optional.

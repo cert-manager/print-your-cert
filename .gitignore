@@ -8,3 +8,6 @@ print-your-cert-front.tar
 *arm64
 guestbook/guestbook
 guestbook/guestbook.sqlite
+
+*.age
+root-print-your-cert-ca.yaml
