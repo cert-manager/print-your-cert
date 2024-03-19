@@ -110,10 +110,7 @@ certificate for IoT
 device](https://crypto.stackexchange.com/questions/83719/smallest-possible-certificate-for-iot-device),
 it seems ECDSA is good for small signatures, and RSA is not good. The
 configuration for the ECDSA signature is shown below in
-[print-your-cert-ca](#print-your-cert-ca). Also, I chose to have a very long
-expiry for both certificates since there is no security risk associated with
-leaking either of the private keys (since the private keys of both will be
-discarded on 23 March 2024 anyways).
+[print-your-cert-ca](#print-your-cert-ca).
 
 The QR code contains a URL of the form:
 
@@ -270,7 +267,7 @@ Once on the booth, you will need to perform these ten tasks:
 > If you need to upgrade Debian on the Raspberry Pi (`apt upgrade`),
 > please upgrade it at least a week before KubeCon so that any breakage (e.g.,
 > the Raspberry UI) can be fixed before the venue! We mistakenly ran `sudo apt
-> upgrade` on the first day of KubeCon in Amsterdam and ended up spending half
+upgrade` on the first day of KubeCon in Amsterdam and ended up spending half
 > of the day fixing it!
 
 First, unplug the micro SD card from the Raspberry Pi and plug it into your
@@ -332,10 +329,14 @@ Then, unmount the micro SD card from your laptop and plug it into the Raspberry.
 Plug a keyboard and mouse to the Raspberry and install Tailscale:
 
 ```bash
+# From the Raspberry Pi:
 curl -fsSL https://tailscale.com/install.sh | sh
 ```
 
-Then, start the login process with:
+Then, login with the following command. It will open a browser window, allowing
+you to log in. Use your GitHub account to log in (Sign In with GitHub ->
+Authorize Tailscale -> Multi-user Tailnet -> select tailnet
+`cert-manager.org.github`).
 
 ```sh
 tailscale up --accept-dns=false
@@ -346,21 +347,18 @@ tailscale up --accept-dns=false
 > Make sure to disable Tailscale's DNS resolution with `--accept-dns=false`. We
 > have seen a ton of problems with Tailscale's DNS resolution.
 
-It will open a browser window, allowing you to log in. Use your GitHub account
-to log in (Sign In with GitHub -> Authorize Tailscale -> Single-user Tailnet).
+If you prefer staying logged in to your personal tailnet, feel free to share the
+machine with your Tailnet in <https://login.tailscale.com/admin/machines>. That
+way, you can stay logged to your tailnet but still be able to access the
+Raspberry Pi.
 
-Then, share the device to the Tailnet `cert-manager.org.github` by going to
-<https://login.tailscale.com/admin/machines>, clicking on the machine
-print-your-cert, "Share...", copy the link, logout, log in using "Multi-user
-Tailnet", use the link to have the machine shared.
-
-Go back to your laptop and run the following command to make sure everyone in
-the cert-manager org can SSH into the Pi:
+Then, go back to your laptop and run the following command to make sure everyone
+in the cert-manager org can SSH into the Pi:
 
 ```bash
 curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.com/orgs/cert-manager/members \
   | jq '.[] | .login' -r \
-  | ssh -t pi@$(tailscale ip -4 pi) \
+  | ssh -t pi@$(tailscale ip -4 pi.comet-ide.ts.net) \
     'set -xe; while read -r i; do curl -LsS https://github.com/$i.keys | tee -a $HOME/.ssh/authorized_keys; done; cat $HOME/.ssh/authorized_keys | sort | sed -re 's/\s+$//' | uniq >a; mv a $HOME/.ssh/authorized_keys'
 ```
 
@@ -368,7 +366,7 @@ curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.c
 
 First, make sure you have Tailscale installed and running. Make sure to be
 [login](https://login.tailscale.com/) using your GitHub account, and select the
-Tailnet "cert-manager.org.github". The Pi is shared to that Tailnet.
+Tailnet `cert-manager.org.github`. The Pi is shared to that Tailnet.
 
 Then, edit your `~/.ssh/config` to add the following:
 
@@ -446,11 +444,6 @@ sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
 ### Booth: Set up the tunnel between the Internet and the Raspberry Pi
 
-> At first, I tried using Wireguard to have a `wg0` interface on the Pi with a
-> public IP (like <http://hoppy.network> does). I documented this (failed)
-> process in
-> [public-ip-on-my-machine-using-wireguard](https://hackmd.io/@maelvls/public-ip-on-my-machine-using-wireguard).
-
 We want to expose the print-your-cert UI on the Internet at
 <https://print-your-cert.cert-manager.io>. To do that, we use a f1-micro VM on
 GCP and use Caddy to terminate the TLS connections and to forward the
@@ -460,16 +453,16 @@ connections to the Raspberry Pi's Tailscale IP.
 https://print-your-cert.cert-manager.io
               |
               |
-              v  130.211.227.213 (eth0)
+              v  35.241.231.131 (eth0)
     +------------------------+
     |  VM "print-your-cert"  |
     |    Caddy + Tailscale   |
     +------------------------+
-              |  100.126.254.167 (tailscale0)
+              |  100.106.168.42 (tailscale0)
               |
               |
               |
-              v  100.121.173.5 (tailscale0)
+              v  100.85.65.38 (tailscale0)
     +-------------------+
     |       Pi          |
     |                   |
@@ -477,30 +470,47 @@ https://print-your-cert.cert-manager.io
     +-------------------+
 ```
 
+Before creating the VM, you will need to get access to the GCP project
+`cert-manager-general`. You can get access by being a maintainer on the
+cert-manager project and requesting to be added to the GCP project.
+
+Then, you will need to make sure you are logged into Tailscale (see one of the
+previous sections).
+
 To create the VM `print-your-cert`, you can use the following command:
 
 > [!NOTE]
-> Use the GCP zone closest to the KubeCon venue. The examples below
-> use `us-central1-c` (Iowa) since the venue was in Chicago.
+>
+> Use the GCP zone closest to the KubeCon venue. The examples below use
+> `europe-west1-c` (Belgium) since the venue was in Paris (I didn't pick Paris
+> as it doesn't have f1-micro VMs).
+
+> [!NOTE]
+>
+> Find out the latest debian image by running:
+>
+> ```bash
+> gcloud compute images list | grep debian
+> ```
 
 ```shell
 # From your laptop:
 gcloud compute firewall-rules create allow-tailscale \
-    --project jetstack-mael-valais \
+    --project cert-manager-general \
     --network default \
     --action allow \
     --direction ingress \
     --rules udp:41641 \
     --source-ranges 0.0.0.0/0
 gcloud compute instances create print-your-cert \
-    --project jetstack-mael-valais \
+    --project cert-manager-general \
     --network default \
     --machine-type=f1-micro \
-    --image-family=debian-11 \
+    --image-family=debian-12 \
     --image-project=debian-cloud \
     --can-ip-forward \
     --boot-disk-size=10GB \
-    --zone=us-central1-c
+    --zone=europe-west1-c
 ```
 
 Then, copy-paste the IP into the print-your-cert.cert-manager.io zone:
@@ -509,8 +519,8 @@ Then, copy-paste the IP into the print-your-cert.cert-manager.io zone:
 
    ```bash
    IP=$(gcloud compute instances describe print-your-cert \
-       --project jetstack-mael-valais \
-       --zone=us-central1-c --format json \
+       --project cert-manager-general \
+       --zone=europe-west1-c --format json \
          | jq -r '.networkInterfaces[].accessConfigs[] | select(.type=="ONE_TO_ONE_NAT") | .natIP')
    ```
 
@@ -526,25 +536,25 @@ Then, copy-paste the IP into the print-your-cert.cert-manager.io zone:
 Then, install Tailscale and make sure IP forwarding is enabled on the VM:
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-your-cert -- 'curl -fsSL https://tailscale.com/install.sh | sh'
-gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-your-cert -- \
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c print-your-cert -- 'curl -fsSL https://tailscale.com/install.sh | sh'
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c print-your-cert -- \
     "sudo perl -ni -e 'print if \!/^net.ipv4.ip_forward=1/d' /etc/sysctl.conf; \
      sudo tee -a /etc/sysctl.conf <<<net.ipv4.ip_forward=1; \
      sudo sysctl -w net.ipv4.ip_forward=1"
 ```
 
-Then, log into Tailscale using your personal GitHub Tailnet (e.g., `maelvls@github`) with
-the command:
+Then, run the following. Click the link that shows and log into Tailscale using
+"Login with GitHub", and then select the Tailnet `cert-manager.org.github`.
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-your-cert -- sudo tailscale up
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c print-your-cert -- sudo tailscale up
 ```
 
-Finally, install Caddy as a systemd unit by following [the official
-guide](https://caddyserver.com/docs/install#debian-ubuntu-raspbian):
+Finally, install Caddy as a systemd unit (these commands are inspired from [the
+official guide](https://caddyserver.com/docs/install#debian-ubuntu-raspbian)):
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-your-cert -- bash <<'EOF'
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c print-your-cert -- bash <<'EOF'
 sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
@@ -554,10 +564,10 @@ EOF
 ```
 
 ```sh
-gcloud compute ssh --project jetstack-mael-valais --zone=us-central1-c print-your-cert -- bash <<'EOF'
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c print-your-cert -- bash <<'EOF'
 sudo tee /etc/caddy/Caddyfile <<CADDY
 print-your-cert.cert-manager.io:443 {
-        reverse_proxy $(tailscale ip -4 pi):8080
+        reverse_proxy $(tailscale ip -4 pi.comet-ide.ts.net):8080
 }
 CADDY
 sudo systemctl restart caddy.service
@@ -569,9 +579,8 @@ EOF
 This prerequisite is useful both for local development and for running the
 experiment on the Raspberry Pi.
 
-First, install the following tools:
+First, install the following tools on the Raspberry Pi:
 
-- [Go](https://go.dev/doc/install) (1.17 or above),
 - [Docker](https://docs.docker.com/engine/install/debian/),
 - [K3d](https://k3d.io/stable/#install-current-latest-release),
 - [Helm](https://helm.sh/docs/intro/install/).
@@ -600,18 +609,43 @@ ssh pi 'k3d kubeconfig get -a | sed "s/0.0.0.0/$(tailscale ip -4)/g"' >/tmp/kc \
 
 ### Booth: Install cert-manager and the issuers on the Raspberry Pi
 
+First install [`age`](https://age-encryption.org/) to be able to decrypt the
+secrets:
+
+```sh
+# From your laptop:
+brew install age
+```
+
 Install cert-manager:
 
 ```sh
 # From the Raspberry Pi:
 helm repo add jetstack https://charts.jetstack.io --force-update
-helm upgrade --install cert-manager jetstack/cert-manager --namespace cert-manager --set installCRDs=true --create-namespace
+helm upgrade --install -n cert-manager cert-manager jetstack/cert-manager \
+  --create-namespace --set installCRDs=true
 ```
 
-Finally, set up the ClusterIssuer:
+Then, decrypt the root CA. The passphrase is available in the Venafi 1Password
+in the `cert-manager-team` vault.
+
+```bash
+# From your laptop:
+age -d root-print-your-cert-ca.yaml.age >root-print-your-cert-ca.yaml
+scp root-print-your-cert-ca.yaml pi:
+```
+
+Next, apply the decrypted root CA secret:
+
+```bash
+# From the Raspberry Pi:
+kubectl apply -f root-print-your-cert-ca.yaml
+```
+
+Finally, apply the ClusterIssuer:
 
 ```sh
-# From the Raspberry Pi:
+kubectl apply -f root_issuer_prod.yaml
 kubectl apply -f cluster_issuer.yaml
 ```
 
@@ -723,6 +757,87 @@ ssh pi docker run -d --restart=always --name brother_ql_web \
   -p 0.0.0.0:8013:8013 ghcr.io/cert-manager/print-your-cert-controller:latest brother_ql_web
 ```
 
+### Booth: Running the guestbook on a VM
+
+The VM that runs the guestbook is managed by `tofu` and is defined in
+[`booth.tf`](https://github.com/cert-manager/infrastructure/blob/main/gcp/booth.tf).
+
+> [!NOTE]
+>
+> TBD: document <https://litestream.io/> that we use for the sqlite backups.
+
+First, you will need to connect to the Raspberry Pi's cluster to be able to
+create the guestbook certificate. You can do that by running the following:
+
+```sh
+# From your laptop:
+ssh pi kubectl apply -f - --wait <guestbook/certificate.yaml
+ssh pi kubectl get secret -n cert-manager root-print-your-cert-ca -ojson \
+  | jq -r '.data."tls.crt" | @base64d' >ca.crt
+ssh pi kubectl get secret -n cert-manager guestbook-tls -ojson \
+  | jq -r '.data."tls.crt" | @base64d' >tls.crt
+ssh pi kubectl get secret -n cert-manager guestbook-tls -ojson \
+  | jq -r '.data."tls.key" | @base64d' >tls.key
+```
+
+Copy the root CA that you decrypted in one of the previous steps:
+
+```bash
+gcloud compute scp --project cert-manager-general --zone=europe-west1-c  \
+  ca.crt tls.crt tls.key guestbook:.
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- \
+  sudo mkdir -p /var/guestbook
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- \
+  sudo mv ca.crt tls.crt tls.key /var/guestbook
+```
+
+Finally, build and push:
+
+```bash
+GOARCH=amd64 GOOS=linux go build -C guestbook .
+gcloud compute scp --project cert-manager-general --zone=europe-west1-c  \
+  guestbook/guestbook test:.
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- \
+  sudo install guestbook /usr/bin
+```
+
+Then, run the following to create the systemd service:
+
+> [!NOTE]
+>
+> If guestbook has never run on this machine, you will first need to run:
+>
+> ```bash
+> gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- \
+>   mkdir /var/guestbook
+> gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- \
+>   guestbook -init-db -db-path /var/guestbook/guestbook.sqlite
+> ```
+
+Finally, run the following to create the systemd service:
+
+```bash
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- bash <<'EOF'
+sudo tee /usr/lib/systemd/system/guestbook.service <<'SVC'
+[Unit]
+Description=cert-manager Booth Guestbook
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/guestbook -ca-cert /var/guestbook/ca.crt -tls-chain /var/guestbook/tls.crt -tls-key /var/guestbook/tls.key -db-path /var/guestbook/guestbook.sqlite -listen :443 -readonly-listen-insecure :80 -autocert-dir /var/guestbook -prod
+
+StandardOutput=journal
+StandardError=journal
+Type=simple
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+SVC
+sudo systemctl daemon-reload
+EOF
+```
+
 ## Local development
 
 ### Local development on the UI
@@ -736,14 +851,69 @@ local machine (it is the same as for the Raspberry Pi).
 Then, you will need to create a ClusterIssuer:
 
 ```sh
-kubectl apply -f cluster_issuer.yaml
+kubectl apply -f root_issuer_dev.yaml --wait
+kubectl apply -f cluster_issuer.yaml --wait
+kubectl get secret -n cert-manager root-print-your-cert-ca -ojson | jq -r '.data."tls.crt" | @base64d' >ca.crt
 ```
 
 Then, you can run the UI:
 
 ```sh
-go run . --issuer=print-your-cert-ca --issuer-kind=ClusterIssuer
+go run . --issuer=print-your-cert-ca --issuer-kind=ClusterIssuer \
+  -guestbook-ca=ca.crt -guestbook-url=guestbook.print-your-cert.cert-manager.io:9090
 ```
+
+### Local development on the guestbook
+
+First, you will need to make sure the domains
+`guestbook.print-your-cert.cert-manager.io` and
+`readonly-guestbook.print-your-cert.cert-manager.io` point to your machine:
+
+```bash
+sudo perl -ni -e 'print if !/ guestbook.print-your-cert.cert-manager.io$/' /etc/hosts
+sudo tee -a /etc/hosts <<<"127.0.0.1 guestbook.print-your-cert.cert-manager.io"
+sudo perl -ni -e 'print if !/ readonly-guestbook.print-your-cert.cert-manager.io$/' /etc/hosts
+sudo tee -a /etc/hosts <<<"127.0.0.1 readonly-guestbook.print-your-cert.cert-manager.io"
+```
+
+Then:
+
+```bash
+kubectl apply -f root_issuer_dev.yaml --wait
+kubectl apply -f cluster_issuer.yaml --wait
+kubectl apply -f guestbook/certificate.yaml --wait
+```
+
+Grab the root CA and the certificate to serve the guestbook:
+
+```bash
+kubectl get secret -n cert-manager root-print-your-cert-ca -ojson | jq -r '.data."tls.crt" | @base64d' >ca.crt
+kubectl get secret -n cert-manager guestbook-tls -ojson | jq -r '.data."tls.crt" | @base64d' >tls.crt
+kubectl get secret -n cert-manager guestbook-tls -ojson | jq -r '.data."tls.key" | @base64d' >tls.key
+go run -C guestbook . -init-db
+go run -C guestbook . -ca-cert ../ca.crt -tls-chain ../tls.crt -tls-key ../tls.key -listen :9090
+```
+
+To use the guestbook, make sure the UI is running locally too (see above).
+
+1. Go to the UI at <http://localhost:8080>.
+2. Submit an email.
+3. Wait for the cert to be ready and click "Sign the guestbook".
+4. Go to the guestbook at <https://readonly-guestbook.print-your-cert.cert-manager.io:9090>. To get a "star" instead of a red cross, you need to use curl (or any HTTP client) to sign the book.
+5. To get a star instead of a cross, go back to the page in (1), click "Download cert bundle tar".
+6. Open a shell session and go to your `~/Downloads` folder.
+7. Run:
+   ```bash
+   tar xf cert-manager-bundle.tar
+   curl -k https://guestbook.print-your-cert.cert-manager.io/write \
+     --cacert ca.crt --cert chain.pem --key pkey.pem \
+     -X POST --data-urlencode message@/dev/stdin \
+   <<EOF
+   Excellent job, Ash!
+   EOF
+   ```
+8. Go back to <https://readonly-guestbook.print-your-cert.cert-manager.io:9090>
+   to see the guestbook. Now, you should see a ⭐!
 
 ### Local development on the controller (that creates PNGs and prints them)
 
