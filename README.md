@@ -110,10 +110,7 @@ certificate for IoT
 device](https://crypto.stackexchange.com/questions/83719/smallest-possible-certificate-for-iot-device),
 it seems ECDSA is good for small signatures, and RSA is not good. The
 configuration for the ECDSA signature is shown below in
-[print-your-cert-ca](#print-your-cert-ca). Also, I chose to have a very long
-expiry for both certificates since there is no security risk associated with
-leaking either of the private keys (since the private keys of both will be
-discarded on 23 March 2024 anyways).
+[print-your-cert-ca](#print-your-cert-ca).
 
 The QR code contains a URL of the form:
 
