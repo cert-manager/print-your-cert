@@ -762,9 +762,81 @@ ssh pi docker run -d --restart=always --name brother_ql_web \
 The VM that runs the guestbook is managed by `tofu` and is defined in
 [`booth.tf`](https://github.com/cert-manager/infrastructure/blob/main/gcp/booth.tf).
 
-> [!IMPORTANT]
+> [!NOTE]
 >
-> To be continued.
+> TBD: document <https://litestream.io/> that we use for the sqlite backups.
+
+First, you will need to connect to the Raspberry Pi's cluster to be able to
+create the guestbook certificate. You can do that by running the following:
+
+```sh
+# From your laptop:
+ssh pi kubectl apply -f - --wait <guestbook/certificate.yaml
+ssh pi kubectl get secret -n cert-manager root-print-your-cert-ca -ojson \
+  | jq -r '.data."tls.crt" | @base64d' >ca.crt
+ssh pi kubectl get secret -n cert-manager guestbook-tls -ojson \
+  | jq -r '.data."tls.crt" | @base64d' >tls.crt
+ssh pi kubectl get secret -n cert-manager guestbook-tls -ojson \
+  | jq -r '.data."tls.key" | @base64d' >tls.key
+```
+
+Copy the root CA that you decrypted in one of the previous steps:
+
+```bash
+gcloud compute scp --project cert-manager-general --zone=europe-west1-c  \
+  ca.crt tls.crt tls.key guestbook:.
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- \
+  sudo mkdir -p /var/guestbook
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- \
+  sudo mv ca.crt tls.crt tls.key /var/guestbook
+```
+
+Finally, build and push:
+
+```bash
+GOARCH=amd64 GOOS=linux go build -C guestbook .
+gcloud compute scp --project cert-manager-general --zone=europe-west1-c  \
+  guestbook/guestbook test:.
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- \
+  sudo install guestbook /usr/bin
+```
+
+Then, run the following to create the systemd service:
+
+> [!NOTE]
+>
+> If guestbook has never run on this machine, you will first need to run:
+>
+> ```bash
+> gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- \
+>   mkdir /var/guestbook
+> gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- \
+>   guestbook -init-db -db-path /var/guestbook/guestbook.sqlite
+> ```
+
+Finally, run the following to create the systemd service:
+
+```bash
+gcloud compute ssh --project cert-manager-general --zone=europe-west1-c guestbook -- bash <<'EOF'
+sudo tee /usr/lib/systemd/system/guestbook.service <<'SVC'
+[Unit]
+Description=cert-manager Booth Guestbook
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/guestbook -ca-cert /var/guestbook/ca.crt -tls-chain /var/guestbook/tls.crt -tls-key /var/guestbook/tls.key -db-path /var/guestbook/guestbook.sqlite -listen :443 -readonly-listen-insecure :80 -autocert-dir /var/guestbook -prod
+
+StandardOutput=journal
+StandardError=journal
+Type=simple
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+SVC
+sudo systemctl daemon-reload
+EOF
+```
 
 ## Local development
 
