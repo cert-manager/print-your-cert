@@ -279,23 +279,23 @@ to something secret (usually the default password is `raspberry`, I changed it;
 see the label on the side of the Raspberry Pi).
 
 Then, you will need to mount the micro SD card to your laptop using a
-SD-to-micro-SD adaptor. Once the SD card is mounted, do the following:
+SD-to-micro-SD adaptor. Once the SD card is mounted, set the following variable
+to where the SD card is mounted:
 
-```shell=sh
-# Enable SSH into the Pi.
-touch /media/pi/boot/ssh
-
-# Enable Wifi.
-tee /media/pi/boot/wpa_supplicant.conf <<EOF
-country=US
-update_config=1
-ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-network={
-  ssid="HARRYCOW_WIFI"
-  psk="..."
-}
-EOF
+```sh
+# On macOS:
+PI=/Volumes/bootfs
 ```
+
+Then, enable SSH on the Pi:
+
+```bash
+touch $PI/ssh
+```
+
+There used to be a way to configure the Wifi password without a screen and
+keyboard, but that's not possible anymore with Bookworm
+([source](https://www.raspberrypi.com/documentation/computers/configuration.html#connect-to-a-wireless-network)).
 
 > If the Wifi doesn't work, somehow SSH into the Pi and run `wpa_cli`:
 >
