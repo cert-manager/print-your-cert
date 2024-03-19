@@ -452,7 +452,7 @@ func downloadTarPage(kclient kubernetes.Interface, ns string) http.Handler {
 func signGuestbookPage(guestbookURL string, remoteRoots *x509.CertPool, kclient kubernetes.Interface, namespace string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
-			http.Error(w, fmt.Sprintf("Only the GET method is supported supported on the path %s.\n", r.URL.Path), http.StatusMethodNotAllowed)
+			http.Error(w, fmt.Sprintf("Only the POST method is supported on the path %s\n", r.URL.Path), http.StatusMethodNotAllowed)
 			return
 		}
 
@@ -469,16 +469,16 @@ func signGuestbookPage(guestbookURL string, remoteRoots *x509.CertPool, kclient 
 
 		certPEM, ok := secret.Data["tls.crt"]
 		if !ok {
-			w.WriteHeader(423)
-			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Internal issue with the stored certificate in Kubernetes."})
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "after-sign.html", afterEventPageData{CertName: certName, FetchKey: fetchKey, Error: "Internal issue with stored certificate"})
 			log.Printf("POST /sign-guestbook: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, namespace, cert.Spec.SecretName)
 			return
 		}
 
 		keyPEM, ok := secret.Data["tls.key"]
 		if !ok {
-			w.WriteHeader(423)
-			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Internal issue with the stored certificate in Kubernetes."})
+			w.WriteHeader(500)
+			tmpl.ExecuteTemplate(w, "after-sign.html", afterEventPageData{CertName: certName, FetchKey: fetchKey, Error: "Internal issue with stored certificate"})
 			log.Printf("POST /sign-guestbook: the requested certificate %s in namespace %s exists, but the Secret %s does not contain a key 'tls.crt'.", certName, namespace, cert.Spec.SecretName)
 			return
 		}
@@ -486,7 +486,7 @@ func signGuestbookPage(guestbookURL string, remoteRoots *x509.CertPool, kclient 
 		clientCertKeyPair, err := tls.X509KeyPair(certPEM, keyPEM)
 		if err != nil {
 			w.WriteHeader(500)
-			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Internal issue with the stored certificate in Kubernetes."})
+			tmpl.ExecuteTemplate(w, "after-sign.html", afterEventPageData{CertName: certName, FetchKey: fetchKey, Error: "Internal issue with stored certificate"})
 			log.Printf("POST /sign-guestbook: invalid certificate: %s", err)
 			return
 		}
@@ -507,7 +507,7 @@ func signGuestbookPage(guestbookURL string, remoteRoots *x509.CertPool, kclient 
 		req, err := http.NewRequestWithContext(r.Context(), "POST", guestbookURL, strings.NewReader(postValues.Encode()))
 		if err != nil {
 			w.WriteHeader(500)
-			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Internal issue with creating request for guestbook"})
+			tmpl.ExecuteTemplate(w, "after-sign.html", afterEventPageData{CertName: certName, FetchKey: fetchKey, Error: "Internal issue with creating request for guestbook"})
 			log.Printf("POST /sign-guestbook: couldn't create request: %s", err)
 			return
 		}
@@ -519,8 +519,8 @@ func signGuestbookPage(guestbookURL string, remoteRoots *x509.CertPool, kclient 
 		if err != nil {
 			// 503 might not be right but this is a demo, so we'll just use it unconditionally for simplicity
 			w.WriteHeader(503)
-			tmpl.ExecuteTemplate(w, "error.html", errorPageData{Error: "Internal issue with creating request for guestbook"})
-			log.Printf("POST /sign-guestbook: couldn't make request: %s", err)
+			tmpl.ExecuteTemplate(w, "after-sign.html", afterEventPageData{CertName: certName, FetchKey: fetchKey, Error: "Internal issue with creating request for guestbook"})
+			log.Printf("POST /sign-guestbook: couldn't execute request: %s", err)
 			return
 		}
 
@@ -533,6 +533,11 @@ func signGuestbookPage(guestbookURL string, remoteRoots *x509.CertPool, kclient 
 			} else {
 				log.Printf("failed to sign guestbook: %s", string(body))
 			}
+
+			w.WriteHeader(503)
+			tmpl.ExecuteTemplate(w, "after-sign.html", afterEventPageData{CertName: certName, FetchKey: fetchKey, Error: fmt.Sprintf("Got error %d when trying to sign guestbook", guestbookResponse.StatusCode)})
+
+			return
 		}
 
 		w.WriteHeader(200)

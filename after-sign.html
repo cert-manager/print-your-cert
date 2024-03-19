@@ -21,14 +21,13 @@
 
       {{if .Error}}
       <div class="error">{{.Error}}</div>
-      {{end}}
-
-      {{if .CertName}}
+      {{else}}
       <div>
         <p>You signed the guestbook! Thanks for taking part in the cert-manager booth demo!</p>
         <p>Note that you get a bonus star in the guestbook if you sign manually using your cert.</p>
         <p>You can download your certificate and private key using the QR code on your printed cert.</p>
       </div>
+      {{end}}
 
       <div class="divider"></div>
 
@@ -37,7 +36,6 @@
         <input name="fetchKey" type="text" value="{{.FetchKey}}" hidden required />
         <input type="submit" value="Back to your certificate" class="constrain" />
       </form>
-      {{end}}
     </div>
   </body>
 </html>
