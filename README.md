@@ -633,6 +633,13 @@ helm upgrade --install -n cert-manager cert-manager jetstack/cert-manager \
   --create-namespace --set installCRDs=true
 ```
 
+Then, apply the ClusterIssuer:
+
+```sh
+kubectl apply -f root_issuer_prod.yaml
+kubectl apply -f cluster_issuer.yaml
+```
+
 Then, decrypt the root CA. The passphrase is available in the Venafi 1Password
 in the `cert-manager-team` vault.
 
@@ -642,18 +649,11 @@ age -d root-print-your-cert-ca.yaml.age >root-print-your-cert-ca.yaml
 scp root-print-your-cert-ca.yaml pi:
 ```
 
-Next, apply the decrypted root CA secret:
+Finally, apply the decrypted root CA secret:
 
 ```bash
 # From the Raspberry Pi:
 kubectl apply -f root-print-your-cert-ca.yaml
-```
-
-Finally, apply the ClusterIssuer:
-
-```sh
-kubectl apply -f root_issuer_prod.yaml
-kubectl apply -f cluster_issuer.yaml
 ```
 
 ### Booth: Run the UI on the Raspberry Pi
