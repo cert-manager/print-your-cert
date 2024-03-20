@@ -75,7 +75,7 @@ func censorEmail(s string) string {
 }
 
 func allMessages(ctx context.Context, db *sql.DB, w io.Writer) ([]byte, error) {
-	rows, err := db.QueryContext(ctx, `SELECT email, user_agent, date, message from entries;`)
+	rows, err := db.QueryContext(ctx, `SELECT email, user_agent, date, message from entries ORDER BY date;`)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +92,9 @@ func allMessages(ctx context.Context, db *sql.DB, w io.Writer) ([]byte, error) {
 		}
 
 		email = censorEmail(email)
+		if utf8.RuneCountInString(userAgent) > 32 {
+			userAgent = string([]rune(userAgent)[:30]) + "..."
+		}
 
 		star := "⭐"
 		if strings.ToLower(userAgent) == "kiosk" {
@@ -146,10 +149,10 @@ func writePage(db *sql.DB, ntfyTopic *string) http.Handler {
 
 		const maxMessageLen = 64
 
-		if len(message) < 2 {
+		if utf8.RuneCountInString(message) < 2 {
 			http.Error(w, "failed to add message to database: message too short / message missing", http.StatusBadRequest)
 			return
-		} else if len(message) > maxMessageLen {
+		} else if utf8.RuneCountInString(message) > maxMessageLen {
 			http.Error(w, fmt.Sprintf("failed to add message to database: message too long, maximum is %d chars", maxMessageLen), http.StatusBadRequest)
 			return
 		}
