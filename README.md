@@ -358,7 +358,7 @@ in the cert-manager org can SSH into the Pi:
 ```bash
 curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.com/orgs/cert-manager/members \
   | jq '.[] | .login' -r \
-  | ssh -t pi@$(tailscale ip -4 pi.comet-ide.ts.net) \
+  | ssh -t pi@100.85.65.38 \
     'set -xe; while read -r i; do curl -LsS https://github.com/$i.keys | tee -a $HOME/.ssh/authorized_keys; done; cat $HOME/.ssh/authorized_keys | sort | sed -re 's/\s+$//' | uniq >a; mv a $HOME/.ssh/authorized_keys'
 ```
 
@@ -567,7 +567,7 @@ EOF
 gcloud compute ssh --project cert-manager-general --zone=europe-west1-c print-your-cert -- bash <<'EOF'
 sudo tee /etc/caddy/Caddyfile <<CADDY
 print-your-cert.cert-manager.io:443 {
-        reverse_proxy $(tailscale ip -4 pi.comet-ide.ts.net):8080
+        reverse_proxy 100.85.65.38:8080
 }
 CADDY
 sudo systemctl restart caddy.service
