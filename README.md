@@ -543,6 +543,13 @@ gcloud compute ssh --project cert-manager-general --zone=europe-west1-c print-yo
      sudo sysctl -w net.ipv4.ip_forward=1"
 ```
 
+We found that the default-http and default-https now require tags to be set:
+
+```bash
+gcloud compute instances add-tags print-your-cert --project cert-manager-general --zone europe-west1-c --tags http-server
+gcloud compute instances add-tags print-your-cert --project cert-manager-general --zone europe-west1-c --tags https-server
+```
+
 Then, run the following. Click the link that shows and log into Tailscale using
 "Login with GitHub", and then select the Tailnet `cert-manager.org.github`.
 
