@@ -37,6 +37,8 @@ var (
 
 	dbPath = flag.String("db-path", "guestbook.sqlite", "Path to sqlite database")
 	initDB = flag.Bool("init-db", false, "If set, initialise a fresh database at db-path")
+
+	ntfyTopic = flag.String("ntfy-topic", "", "If set, a ntfy.sh topic to post to when a new guestbook entry is made")
 )
 
 func indexPage(db *sql.DB) http.Handler {
@@ -124,7 +126,7 @@ func getUserAgent(r *http.Request) string {
 	return agent
 }
 
-func writePage(db *sql.DB) http.Handler {
+func writePage(db *sql.DB, ntfyTopic *string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger := LoggerFromContext(r.Context()).With("handler", "write")
 		err := r.ParseForm()
@@ -159,11 +161,32 @@ func writePage(db *sql.DB) http.Handler {
 			return
 		}
 
+		if ntfyTopic != nil {
+			err := ntfy(*ntfyTopic, email, userAgent, message)
+			if err != nil {
+				logger.Error("failed to send ntfy message", "error", err)
+			}
+		}
+
 		logger.Info("added message", "email", email, "contents", message, "user-agent", userAgent)
 
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("successfully added message, thanks for visiting the booth!\n"))
 	})
+}
+
+// This function taken from a MIT-licensed project from github.com/SgtCoDFish
+func ntfy(topic string, email string, userAgent string, message string) error {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	ntfyMessage := strings.NewReader(
+		fmt.Sprintf("%s (%s) posted to the guestbook: %q", email, userAgent, message),
+	)
+
+	_, err := client.Post(fmt.Sprintf("https://ntfy.sh/%s", topic), "text/plain", ntfyMessage)
+	return err
 }
 
 func loadCACerts(path string) (*x509.CertPool, error) {
@@ -287,7 +310,7 @@ func run(ctx context.Context) error {
 
 	serveMux := http.NewServeMux()
 	serveMux.Handle("GET /", certExtractMiddleware(indexPage(db)))
-	serveMux.Handle("POST /write", certExtractMiddleware(writePage(db)))
+	serveMux.Handle("POST /write", certExtractMiddleware(writePage(db, ntfyTopic)))
 	server := &http.Server{
 		Handler:     serveMux,
 		BaseContext: func(l net.Listener) context.Context { return ctx },
