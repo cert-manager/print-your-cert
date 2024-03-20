@@ -677,7 +677,14 @@ Now, ssh into the Raspberry Pi and launch the UI:
 # From your laptop.
 ssh pi docker rm -f print-your-cert-ui
 ssh pi 'kubectl get secret -n cert-manager root-print-your-cert-ca --template="{{index .data \"tls.crt\" | base64decode}}" | tee ca.crt'
-ssh pi docker run -d --restart=always --name print-your-cert-ui --net=host -v '/home/pi/.kube/config:/home/nonroot/.kube/config' -v '/home/pi/ca.crt:/home/nonroot/ca.crt' ghcr.io/cert-manager/print-your-cert-ui:latest --issuer print-your-cert-ca --issuer-kind ClusterIssuer --listen 0.0.0.0:8080 --guestbook-ca /home/nonroot/ca.crt
+ssh pi docker run -d --restart=always --name print-your-cert-ui --net=host \
+  -v '/home/pi/.kube/config:/home/nonroot/.kube/config' \
+  -v '/home/pi/ca.crt:/home/nonroot/ca.crt' \
+  ghcr.io/cert-manager/print-your-cert-ui:latest \
+  --issuer print-your-cert-ca \
+  --issuer-kind ClusterIssuer \
+  --listen 0.0.0.0:8080 \
+  --guestbook-ca /home/nonroot/ca.crt
 ```
 
 > [!NOTE]
