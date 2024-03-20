@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"text/tabwriter"
 	"time"
+	"unicode/utf8"
 
 	"github.com/inconshreveable/go-vhost"
 	_ "modernc.org/sqlite"
@@ -135,6 +136,21 @@ func writePage(db *sql.DB) http.Handler {
 		email := EmailFromContext(r.Context())
 		userAgent := getUserAgent(r)
 		message := r.Form.Get("message")
+
+		if !utf8.ValidString(message) {
+			http.Error(w, "failed to add message to database: message wasn't valid utf-8", http.StatusBadRequest)
+			return
+		}
+
+		const maxMessageLen = 64
+
+		if len(message) < 2 {
+			http.Error(w, "failed to add message to database: message too short / message missing", http.StatusBadRequest)
+			return
+		} else if len(message) > maxMessageLen {
+			http.Error(w, fmt.Sprintf("failed to add message to database: message too long, maximum is %d chars", maxMessageLen), http.StatusBadRequest)
+			return
+		}
 
 		err = addMessage(r.Context(), db, email, userAgent, message)
 		if err != nil {
