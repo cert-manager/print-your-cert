@@ -23,6 +23,10 @@ spec:
   duration: 87600h # 10 years
   dnsNames:
   - guestbook.print-your-cert.cert-manager.io
+  - readonly-guestbook.print-your-cert.cert-manager.io
+  ipAddresses:
+  - 127.0.0.1
+  - "::1"
   issuerRef:
     name: root-print-your-cert-ca-issuer
     kind: Issuer
