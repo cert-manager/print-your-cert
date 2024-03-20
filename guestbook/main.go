@@ -75,7 +75,7 @@ func censorEmail(s string) string {
 }
 
 func allMessages(ctx context.Context, db *sql.DB, w io.Writer) ([]byte, error) {
-	rows, err := db.QueryContext(ctx, `SELECT email, user_agent, date, message from entries;`)
+	rows, err := db.QueryContext(ctx, `SELECT email, user_agent, date, message from entries ORDER BY date;`)
 	if err != nil {
 		return nil, err
 	}
