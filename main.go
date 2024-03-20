@@ -520,7 +520,7 @@ func signGuestbookPage(guestbookURL string, remoteRoots *x509.CertPool, kclient 
 
 		guestbookClient := &http.Client{
 			Transport: transport,
-			Timeout:   5 * time.Second,
+			Timeout:   15 * time.Second,
 		}
 
 		postValues := url.Values{}
