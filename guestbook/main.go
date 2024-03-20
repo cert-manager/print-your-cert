@@ -106,7 +106,7 @@ func allMessages(ctx context.Context, db *sql.DB, w io.Writer) ([]byte, error) {
 func addMessage(ctx context.Context, db *sql.DB, email string, userAgent string, msg string) error {
 	timestamp := time.Now().Format(time.RFC3339Nano)
 
-	_, err := db.ExecContext(ctx, `insert into entries(email, user_agent, date, message) values($1, $2, $3, $4);`, email, userAgent, timestamp, msg)
+	_, err := db.ExecContext(ctx, `insert into entries(email, user_agent, date, message) values($1, $2, $3, $4) on conflict(email) do update set user_agent=excluded.user_agent,date=excluded.date,message=excluded.message;`, email, userAgent, timestamp, msg)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func writePage(db *sql.DB) http.Handler {
 
 		err = addMessage(r.Context(), db, email, userAgent, message)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			logger.Error("failed to add message to database", "error", err)
 			http.Error(w, "failed to add message to database", http.StatusBadRequest)
 			return
 		}
@@ -146,7 +146,7 @@ func writePage(db *sql.DB) http.Handler {
 		logger.Info("added message", "email", email, "contents", message, "user-agent", userAgent)
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("successfully added message"))
+		w.Write([]byte("successfully added message, thanks for visiting the booth!\n"))
 	})
 }
 
@@ -345,7 +345,7 @@ func createDB(ctx context.Context, path string) error {
 
 	defer db.Close()
 
-	if _, err = db.ExecContext(ctx, `create table entries(email, user_agent, date, message);`); err != nil {
+	if _, err = db.ExecContext(ctx, `create table entries(email TEXT UNIQUE, user_agent TEXT, date TEXT, message TEXT);`); err != nil {
 		return err
 	}
 

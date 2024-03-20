@@ -22,6 +22,7 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -53,6 +54,7 @@ var (
 
 	guestbookURL        = flag.String("guestbook-url", "https://guestbook.print-your-cert.cert-manager.io/write", "URL of the write path for the guestbook")
 	guestbookRootCAPath = flag.String("guestbook-ca", "guestbook/ca.crt", "Path to the CA certificate for the guestbook")
+	guestbookLocal      = flag.Bool("guestbook-local", false, "If true, redirect guestbook requests to 127.0.0.1 for local testing while preserving the SNI header from guestbook-url")
 )
 
 const (
@@ -411,14 +413,18 @@ func downloadTarPage(kclient kubernetes.Interface, ns string) http.Handler {
 		var files = []struct {
 			Name string
 			Body []byte
+			Mode int64
 		}{
-			{"chain.pem", certPEM},
-			{"pkey.pem", keyPEM},
+			{"chain.pem", certPEM, 0o600},
+			{"pkey.pem", keyPEM, 0o600},
+			{"sign.sh", []byte(signSH), 0o700},
+			{"README.md", []byte(signREADME), 0o600},
 		}
+
 		for _, file := range files {
 			hdr := &tar.Header{
 				Name: file.Name,
-				Mode: 0600,
+				Mode: file.Mode,
 				Size: int64(len(file.Body)),
 			}
 
@@ -491,14 +497,30 @@ func signGuestbookPage(guestbookURL string, remoteRoots *x509.CertPool, kclient 
 			return
 		}
 
-		guestbookClient := &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					Certificates: []tls.Certificate{clientCertKeyPair},
-					RootCAs:      remoteRoots,
-				},
+		transport := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				Certificates: []tls.Certificate{clientCertKeyPair},
+				RootCAs:      remoteRoots,
 			},
-			Timeout: 5 * time.Second,
+		}
+
+		if *guestbookLocal {
+			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				// redirect all connections to 127.0.0.1
+				// should only be used for dev
+				dialer := &net.Dialer{
+					Timeout:   10 * time.Second,
+					KeepAlive: 2 * time.Second,
+				}
+
+				addr = "127.0.0.1" + addr[strings.LastIndex(addr, ":"):]
+				return dialer.DialContext(ctx, network, addr)
+			}
+		}
+
+		guestbookClient := &http.Client{
+			Transport: transport,
+			Timeout:   5 * time.Second,
 		}
 
 		postValues := url.Values{}
@@ -514,6 +536,7 @@ func signGuestbookPage(guestbookURL string, remoteRoots *x509.CertPool, kclient 
 
 		req.Header.Add("content-type", "application/x-www-form-urlencoded")
 		req.Header.Add("user-agent", "kiosk")
+		req.Header.Add("host", "guestbook.print-your-cert.cert-manager.io")
 
 		guestbookResponse, err := guestbookClient.Do(req)
 		if err != nil {
@@ -1070,3 +1093,20 @@ func getPublicKeyAlgorithm(algorithm x509.PublicKeyAlgorithm, key interface{}) s
 	}
 	return fmt.Sprintf("%s %s", algorithm, params)
 }
+
+const signSH = `#!/usr/bin/env bash
+
+set -eu -o pipefail
+
+curl --cert chain.pem --key pkey.pem https://guestbook.print-your-cert.cert-manager.io/write \
+	-X POST \
+	-H "Content-Type: application/x-www-form-urlencoded" \
+	-d "message=I'm a star"
+`
+
+const signREADME = `Thanks for downloading your certificate from the cert-manager booth at KubeCon Paris 2024!
+
+You can run sign.sh to sign the guestbook - feel free to customise the message!
+
+You can fetch guestbook entries using: curl https://readonly-guestbook.print-your-cert.cert-manager.io
+`
