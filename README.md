@@ -751,6 +751,7 @@ ssh pi docker load <print-your-cert-controller.tar
 Now, SSH into the Raspberry Pi and launch the controller:
 
 ```sh
+ssh pi sudo chmod a+r ~/.kube/config
 ssh pi docker rm -f print-your-cert-controller
 ssh pi docker run -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb -v /home/pi/.kube/config:/root/.kube/config --net=host ghcr.io/cert-manager/print-your-cert-controller:latest
 ```
