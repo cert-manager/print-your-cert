@@ -25,6 +25,8 @@
           <div class="content" id="content">
             <label>Subject</label>
             <div id="placeholder-subject"></div>
+            <label>Subject Alternative Names</label>
+            <div id="placeholder-sans"></div>
             <label>Issuer</label>
             <div id="placeholder-issuer"></div>
             <label>Serial</label>
@@ -42,8 +44,14 @@
           </div>
         </div>
       </div>
+
+      <a id="placeholder-download-pem">Download <code>client.crt</code></a>
+
+      <a id="placeholder-download-pem-key">Download <code>client.key</code></a>
+
       <p>This URL will be kept alive as long as GitHub Pages is alive.</p>
       <div class="push"></div>
+
     </div>
     <footer>
       <p>
@@ -52,7 +60,7 @@
       </p>
       <p class="small">
         Project proudly supported by
-        <a href="https://jetstack.io" target="_blank">jetstack.io</a>
+        <a href="https://venafi.com" target="_blank">Venafi</a>
       </p>
       <p class="small">
         Design by
@@ -65,17 +73,37 @@
     <script>
       try {
         const cert = getAsn1();
-        document.getElementById("placeholder-pem").innerHTML = cert;
         document.getElementById("placeholder-subject").innerHTML = cert.subject;
+        cert.extensions.forEach((extension) => {
+          if (extension.type === "2.5.29.17") {
+            document.getElementById("placeholder-sans").innerHTML = extension.names.items;
+          }
+        });
         document.getElementById("placeholder-issuer").innerHTML = cert.issuer;
         document.getElementById("placeholder-serial").innerHTML =
-          cert.serialNumber;
+        cert.serialNumber;
         document.getElementById("placeholder-algorithm").innerHTML =
-          cert.signatureAlgorithm.name;
+        cert.signatureAlgorithm.name;
         document.getElementById("placeholder-not-before").innerHTML =
-          cert.notBefore;
+        cert.notBefore;
         document.getElementById("placeholder-not-after").innerHTML =
-          cert.notAfter;
+        cert.notAfter;
+        document.getElementById("placeholder-pem").innerHTML = cert;
+
+        const blobcert = new Blob([cert], { type: 'application/octet-stream' });
+        const downloadCertLink = document.getElementById("placeholder-download-pem");
+        downloadCertLink.href = URL.createObjectURL(blobcert);
+        downloadCertLink.download = 'client.crt';
+
+        var key = params.key || params.k; // Example: "MIIDBzCCAe%2Bg...GLMQswCQYD%0A"
+        if (!key) {
+          console.log("the query parameter 'k' or 'key' was not passed, skipping");
+        } else {
+          const blobkey = new Blob([`-----BEGIN PRIVATE KEY-----\n${key}\n-----END PRIVATE KEY-----`], { type: 'application/octet-stream' });
+        const downloadKeyLink = document.getElementById("placeholder-download-pem-key");
+        downloadKeyLink.href = URL.createObjectURL(blobkey);
+        downloadKeyLink.download = 'client.key';
+        }
       } catch (e) {
         document.getElementById("content").innerHTML =
           "Issue with the certificate: " + e;
@@ -85,7 +113,6 @@
 </html>
 
 <!--
-  Example:
-
-  https://cert-manager.github.io/print-your-cert/?asn1=MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUwIwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEzMDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFyIDxmb28uYmFyQGJhci5mb28%2BMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtmGM5lil9Vw%2Fy5LhpgO8t5gSb5oUo%2BDp5vWw0Z5C7rjvifi0%2FeD9MbVFkxb%2B%2BhmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF67KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74%2BNl6tyjlMOsTHv%2BLY0jPfmAtO6eR%2BEf%2FHvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94YcpgsJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh%2FQRv8ksX%2BOupHTNdH06WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH%2FBAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggqhkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIgaPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc%3D
+  Old example: https://cert-manager.github.io/print-your-cert/?asn1=MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUwIwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEzMDkwMFoXDTIyMDgxNDEzMDkwMFowLDEqMCgGA1UEAwwhZm9vIGJhciBmb28gYmFyIDxmb28uYmFyQGJhci5mb28%2BMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtmGM5lil9Vw%2Fy5LhpgO8t5gSb5oUo%2BDp5vWw0Z5C7rjvifi0%2FeD9MbVFkxb%2B%2BhmOaaNCVgqDUio1OBOZyL90KzdnGW7nz1fRM2KCNrDF5Y1mO7uv1ZTZa8cVBjF67KjFuNkvvHp74m65bKwXeCHXJBmO3Z1FH8hudICU74%2BNl6tyjlMOsTHv%2BLY0jPfmAtO6eR%2BEf%2FHvgzwsjKds12vdlRCdHSS6u5zlrZZxF3zTO7YuAM7mN8Wbjq94YcpgsJ5ssNOtMu9FwZtPGQDHPaQyVQ86FfjhmMi1IUOUAAGwh%2FQRv8ksX%2BOupHTNdH06WmIDCaGBjWFgPkwicavMZgZG3QIDAQABo0EwPzAOBgNVHQ8BAf8EBAMCBaAwDAYDVR0TAQH%2FBAIwADAfBgNVHSMEGDAWgBQG5XQnDhOUa748L9H7TWZN2avluTAKBggqhkjOPQQDAgNHADBEAiBXmyJ24PTG76pEyq6AQtCo6TXEidqJhsmK9O5WjGBw7wIgaPbcFI5iMMgfPGEATH2AGGutZ6MlxBmwhEO7pAkqhQc%3D
+  New: https://cert-manager.github.io/print-your-cert?asn1=MIIB0DCCAXagAwIBAgIQWAoGJWnoYNfbqUzmYyMqmjAKBggqhkjOPQQDAjBaMQswCQYDVQQGEwJGUjENMAsGA1UEChMEQ05DRjEVMBMGA1UECxMMY2VydC1tYW5hZ2VyMSUwIwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMCAXDTI0MDMxNDE1MTA0NFoYDzIwNTQwMzA3MTUxMDQ0WjAbMQswCQYDVQQGEwJGUjEMMAoGA1UEAxMDRm9vMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4pc0prMyiFxKiA2kbVrnhoBo5yq1vstBflMoCQ7tG5jZTlvlnB%2BZKvlIs9xu6IOTwQRGRb87Vr15N7FsxFUA9KNbMFkwDgYDVR0PAQH%2FBAQDAgWgMAwGA1UdEwEB%2FwQCMAAwHwYDVR0jBBgwFoAUoVmkv3mQGC9o5sHbtSZPstHCpjkwGAYDVR0RBBEwD4ENZm9vQHNkYXNkYS5mcjAKBggqhkjOPQQDAgNIADBFAiAO1fav7a1PY6m2ewUj0iHEOdRHmfBNBeMNd95e7V4uSgIhAMzIasuW9Nkds%2Fm6CMfILVDho0aXcunBWI4aEKEQuEPv&key=MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXMl4DsNH0Ib6al8CcC%2BwDuZYnz4bBhursio%2FGYnQM5ihRANCAATilzSmszKIXEqIDaRtWueGgGjnKrW%2By0F%2BUygJDu0bmNlOW%2BWcH5kq%2BUiz3G7og5PBBEZFvztWvXk3sWzEVQD0
 -->
