@@ -6,7 +6,7 @@
 
 This experiment was run at the cert-manager booth at KubeCon EU 2022 in
 Valencia, KubeCon NA 2022 in Detroit, KubeCon EU 2023 in Amsterdam,
-and KubeCon NA 2023 in Chicago.
+KubeCon NA 2023 in Chicago, and Kubecon EU 2024 in Paris.
 
 ⚠️ Except for the URL <cert-manager.github.io/print-your-cert/> which should
 work forever, the other URLs and IPs presented in this README are temporary.
