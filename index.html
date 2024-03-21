@@ -23,6 +23,8 @@
 
         <div class="panel">
           <div class="content" id="content">
+            <label>Status</label>
+            <div id="placeholder-status"></div>
             <label>Subject</label>
             <div id="placeholder-subject"></div>
             <label>Issuer</label>
@@ -76,6 +78,18 @@
           cert.notBefore;
         document.getElementById("placeholder-not-after").innerHTML =
           cert.notAfter;
+
+        validate(cert, "static/2022-valencia-ca-2.pem")
+          .then((result) => {
+            document.getElementById("placeholder-status").innerHTML =
+              result === true
+                ? "Certificate is valid"
+                : "Certificate is not valid";
+          })
+          .catch((e) => {
+            document.getElementById("placeholder-status").innerHTML =
+              "Issue when validating the certificate: " + e;
+          });
       } catch (e) {
         document.getElementById("content").innerHTML =
           "Issue with the certificate: " + e;

@@ -39,7 +39,6 @@ function getAsn1() {
     // x509.X509Certificate can accept a base64 URL-encoded DER-encoded
     // certificate, so we don't need to do any decoding.
     cert = new x509.X509Certificate(base64der);
-    console.log(cert);
     return cert;
   } catch (e) {
     throw new Error(
@@ -78,4 +77,26 @@ function wordWrap(str, maxWidth) {
 function testWhite(x) {
   var white = new RegExp(/^\s$/);
   return white.test(x.charAt(0));
+}
+
+async function validate(cert, urlRootCAPEM) {
+  if (!cert) {
+    throw new Error("the certificate is null");
+  }
+
+  var pem = await fetch(urlRootCAPEM)
+    .then((resp) => resp.text())
+    .catch((err) => {
+      throw new Error("failed to fetch the root certificate: " + err);
+    });
+
+  var root = new x509.X509Certificate(pem);
+
+  console.log("root=", root);
+  console.log("cert=", cert);
+
+  return await cert.verify(
+    { publicKey: await root.publicKey.export(crypto), signatureOnly: false },
+    crypto
+  );
 }
