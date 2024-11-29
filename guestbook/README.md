@@ -2,12 +2,28 @@
 
 ## Setup
 
-1. Manually copied a locally built guestbook binary, litestream.yml, the systemd service, the cert, key and CA files to the remote VM.
-2. Installed litestream manually, then moved litestream.yml to /etc/litestream.yml
-3. Moved the systemd unit to /usr/lib/systemd/system
-4. Created /var/guestbook
-5. Ran the guestbook with init-db to create the db, moved it to /var/guestbook
-6. Enabled litestream and the systemd unit
+1. Create a VM for running the guestbook in the cert-manager-general GCP project.
+    - Example CLI command is below
+    - Be sure to use a debian-based Linux distro
+2. On a running k8s cluster with cert-manager (not on the guestbook VM):
+    - Set up a [Google Cloud DNS secret](https://cert-manager.io/docs/configuration/acme/dns01/google/)
+    - Be sure to use the cert-manager-general project!
+    - Apply `letsencrypt-cert.yaml`
+    - Export the resulting cert and key
+3. Manually copy the following files to the remote guestbook VM:
+   - Locally built guestbook binary
+   - litestream.yml
+   - guestbook.service
+   - The cert chain and key from Let's Encrypt
+   - The root CA from the Pi (used for mTLS)
+4. Install litestream [manually](https://litestream.io/install/debian/) with `dpkg`
+5. Move `litestream.yml` to `/etc/litestream.yml`
+    - Check that the bucket configuration is correct and that the VM's SA has access to the bucket
+    - Litestream will back the database up to GCS when a write occurs
+6. Move `guestbook.service` to `/usr/lib/systemd/system`
+7. Create `/var/guestbook`
+8. Run `sudo guestbook -init-db -db-path /var/guestbook/guestbook.sqlite`
+9. `sudo systemctl enable --now guestbook.service litestream.service`
 
 ## Root CA
 
@@ -65,4 +81,25 @@ Certificate:
     74:8f:41:7e:01:9b:fb:f9:10:5b:66:57:cc:bc:26:fc:53:fa:
     40:02:20:66:ad:b0:9f:97:d9:56:ec:7c:65:71:7b:07:1d:b6:
     64:4a:6c:b7:6d:c6:58:0c:1f:6a:64:d4:98:12:e5:80:50
+```
+
+## gcloud CLI for VM
+
+```bash
+gcloud compute instances create print-your-cert-guestbook-20241127-090928 \
+           --project=cert-manager-general \
+           --zone=us-central1-f \
+           --machine-type=e2-medium \
+           --network-interface=network-tier=PREMIUM,stack-type=IPV4_ONLY,subnet=default \
+           --maintenance-policy=MIGRATE \
+           --provisioning-model=STANDARD \
+           --service-account=guestbook-sa@cert-manager-general.iam.gserviceaccount.com \
+           --scopes=https://www.googleapis.com/auth/devstorage.read_write,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/trace.append \
+           --tags=https-server \
+           --create-disk=auto-delete=yes,boot=yes,device-name=print-your-cert-guestbook,image=projects/debian-cloud/global/images/debian-12-bookworm-v20241009,mode=rw,size=10,type=pd-balanced \
+           --no-shielded-secure-boot \
+           --shielded-vtpm \
+           --shielded-integrity-monitoring \
+           --labels=goog-ec-src=vm_add-gcloud \
+           --reservation-affinity=any
 ```

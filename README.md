@@ -31,9 +31,9 @@ work forever, the other URLs and IPs presented in this README are temporary.
 - [Local development](#local-development)
   - [Local development on the UI](#local-development-on-the-ui)
   - [Local development on the controller (that creates PNGs and prints them)](#local-development-on-the-controller-that-creates-pngs-and-prints-them)
-    - [`pem-to-png`](#pem-to-png)
+    - [`cert-card`](#cert-card)
     - [Testing the printer](#testing-the-printer)
-    - [Testing pem-to-png](#testing-pem-to-png)
+    - [Testing cert-card](#testing-cert-card)
 - [Troubleshooting](#troubleshooting)
   - [From the CLI: `usb.core.USBError: [Errno 13] Access denied (insufficient permissions)`](#from-the-cli-usbcoreusberror-errno-13-access-denied-insufficient-permissions)
   - [From the CLI: `usb.core.USBError: [Errno 16] Resource busy`](#from-the-cli-usbcoreusberror-errno-16-resource-busy)
@@ -227,8 +227,7 @@ https://print-your-cert.cert-manager.io
 
 ## Staff: test things
 
-For anyone who is in the cert-manager org and wants to test or debug
-things:
+For anyone who is authorized and wants to test or debug things:
 
 - [Install tailscale](https://tailscale.com/download/).
 - Run `tailscale up`, it should open something in your browser → "Sign in
@@ -242,9 +241,6 @@ things:
   ```sh
   ssh pi@100.121.173.5
   ```
-
-  > The public keys of each cert-manager org member have been added to the
-  > `authorized_keys` of the Pi.
 
 ## Running everything on the Raspberry Pi (on the booth)
 
@@ -273,29 +269,16 @@ upgrade` on the first day of KubeCon in Amsterdam and ended up spending half
 First, unplug the micro SD card from the Raspberry Pi and plug it into your
 laptop using a micro-SD-to-SD card adaptor.
 
-Then, install Raspberry OS (Debian Bookworm) on the Pi using the Imager program.
-In the Imager program settings, I changed the username to `pi` and the password
-to something secret (usually the default password is `raspberry`, I changed it;
-see the label on the side of the Raspberry Pi).
+Then, install Raspberry OS on the microSD card using the Imager program.
+In the Imager program settings, change the username to `certmanager` and the password
+to something secret.
 
-Then, you will need to mount the micro SD card to your laptop using a
-SD-to-micro-SD adaptor. Once the SD card is mounted, set the following variable
-to where the SD card is mounted:
+Be sure also to enable SSH with password authentication.
 
-```sh
-# On macOS:
-PI=/Volumes/bootfs
-```
+You can also use the imager to setup a WiFi connection, which might be helpful
+with initial setup at home.
 
-Then, enable SSH on the Pi:
-
-```bash
-touch $PI/ssh
-```
-
-There used to be a way to configure the Wifi password without a screen and
-keyboard, but that's not possible anymore with Bookworm
-([source](https://www.raspberrypi.com/documentation/computers/configuration.html#connect-to-a-wireless-network)).
+At the conference, you should be able to use the GUI to set up a WiFi connection.
 
 > If the Wifi doesn't work, somehow SSH into the Pi and run `wpa_cli`:
 >
@@ -322,7 +305,7 @@ keyboard, but that's not possible anymore with Bookworm
 > sudo ifconfig wlan0 up
 > ```
 
-Then, unmount the micro SD card from your laptop and plug it into the Raspberry.
+Then, unmount the micro SD card from your laptop and plug it into the Raspberry Pi.
 
 ### Booth: Set Up Tailscale on the Raspberry Pi
 
@@ -352,8 +335,13 @@ machine with your Tailnet in <https://login.tailscale.com/admin/machines>. That
 way, you can stay logged to your tailnet but still be able to access the
 Raspberry Pi.
 
-Then, go back to your laptop and run the following command to make sure everyone
-in the cert-manager org can SSH into the Pi:
+#### Allowing SSH Access to cert-manager org members
+
+If desired, the script below will allow SSH access to cert-manager org members.
+
+This might be overkill; you can also just download any GitHub user's SSH keys
+using `curl -LO https://github.com/<user>.keys` and then append the contents of
+that file to `.ssh/authorized_keys`.
 
 ```bash
 curl -sH "Authorization: token $(lpass show github.com -p)" https://api.github.com/orgs/cert-manager/members \
@@ -482,8 +470,7 @@ To create the VM `print-your-cert`, you can use the following command:
 > [!NOTE]
 >
 > Use the GCP zone closest to the KubeCon venue. The examples below use
-> `europe-west1-c` (Belgium) since the venue was in Paris (I didn't pick Paris
-> as it doesn't have f1-micro VMs).
+> `europe-west1-c` (Belgium). Try to pick a zone with low CO2 emissions.
 
 > [!NOTE]
 >
@@ -579,6 +566,17 @@ print-your-cert.cert-manager.io:443 {
 CADDY
 sudo systemctl restart caddy.service
 EOF
+```
+
+Finally, you'll need to ensure that the tailscale ACLs allow traffic to the pi.
+
+Visit [the Tailscale admin panel](https://login.tailscale.com/admin/acls/file) and set the "hosts" key
+to include the Pi, and ensure that there's an ACL allowing traffic:
+
+```text
+"acls": [
+    {"action": "accept", "users": ["*"], "ports": ["raspberrypi:*"]},
+]
 ```
 
 ### Prerequisite: install k3s on the Raspberry Pi
@@ -677,7 +675,7 @@ Now, ssh into the Raspberry Pi and launch the UI:
 # From your laptop.
 ssh pi docker rm -f print-your-cert-ui
 ssh pi docker run -d --restart=always --name print-your-cert-ui --net=host \
-  -v '/home/pi/.kube/config:/home/nonroot/.kube/config' \
+  -v '/home/certmanager/.kube/config:/home/nonroot/.kube/config' \
   ghcr.io/cert-manager/print-your-cert-ui:latest \
   --issuer print-your-cert-ca \
   --issuer-kind ClusterIssuer \
@@ -761,7 +759,7 @@ Now, SSH into the Raspberry Pi and launch the controller:
 ```sh
 ssh pi sudo chmod a+r ~/.kube/config
 ssh pi docker rm -f print-your-cert-controller
-ssh pi docker run -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb -v /home/pi/.kube/config:/root/.kube/config --net=host ghcr.io/cert-manager/print-your-cert-controller:latest
+ssh pi docker run -d --restart=always --name print-your-cert-controller --privileged -v /dev/bus/usb:/dev/bus/usb -v /home/certmanager/.kube/config:/root/.kube/config --net=host ghcr.io/cert-manager/print-your-cert-controller:latest
 ```
 
 You can also run the "debug" printer UI (brother_ql_web) if you want to make
@@ -933,16 +931,16 @@ To use the guestbook, make sure the UI is running locally too (see above).
 
 ### Local development on the controller (that creates PNGs and prints them)
 
-The controller is made in two pieces: `pem-to-png` that turns one PEM into two
-PNGs, and `print-your-cert-controller` that runs `pem-to-png` every time a
+The controller is made in two pieces: `cert-card` which produces a PNG with the label(s),
+and `print-your-cert-controller` that runs `cert-card` every time a
 certificate object in Kubernetes becomes ready.
 
-#### `pem-to-png`
+#### `cert-card`
 
-pem-to-png is what turns a PEM file into two PNGs: `front.png` and `back.png`.
+`cert-card` which produces a PNG with the label(s)
 
 ```sh
-brew install imagemagick qrencode step svn
+brew install imagemagick qrencode step
 brew install homebrew/cask-fonts/font-open-sans
 brew install homebrew/cask-fonts/font-dejavu
 ```
@@ -950,7 +948,7 @@ brew install homebrew/cask-fonts/font-dejavu
 To run it, for example:
 
 ```sh
-./pem-to-png <<EOF
+./cert-card <<EOF
 -----BEGIN CERTIFICATE-----
 MIICXDCCAgOgAwIBAgIQdPaTuGSUDeosii4dbdLBgTAKBggqhkjOPQQDAjAnMSUw
 IwYDVQQDExxUaGUgY2VydC1tYW5hZ2VyIG1haW50YWluZXJzMB4XDTIyMDUxNjEz
@@ -978,16 +976,16 @@ convert -size 230x30 -background white -font /usr/share/fonts/TTF/OpenSans-Regul
 brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 example.png
 ```
 
-#### Testing pem-to-png
+#### Testing cert-card
 
 ```shell=sh
 openssl genrsa -out ca.key 2048
 openssl req -x509 -new -nodes -key ca.key -utf8 -subj "/CN=Maël Valais <mael@vls.dev>/O=Jetstack" -reqexts v3_req -extensions v3_ca -out ca.crt
 step certificate create "CN=Foo Bar <foo@bar.com>" foo.crt foo.key --ca ca.crt --ca-key ca.key --password-file /dev/null
-pem-to-png <foo.crt
-timg pem-to-png.png
+cert-card <foo.crt
+timg cert-card.png
 read
-brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 pem-to-png.png
+brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 cert-card.png
 ```
 
 ## Troubleshooting

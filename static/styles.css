@@ -9,7 +9,7 @@ html {
   background-attachment: fixed;
   font-family: "Montserrat", Helvetica, Arial, serif;
   color: #fff;
-  font-size: 16px;
+  font-size: 24px;
 }
 
 .wrapper {
@@ -227,11 +227,12 @@ tr th {
   border-bottom: 2px solid rgba(1, 75, 188, 0.5);
   font-size: 20px;
 }
+/*
 tr th:last-child,
 tr td:last-child {
   text-align: right;
   width: 200px;
-}
+}*/
 tr td {
   padding: 12px 10px;
   border-bottom: 2px solid rgba(1, 75, 188, 0.15);
@@ -244,3 +245,6 @@ tr td.limit {
 	max-width: 200px;
 }
 
+input[type="radio"] {
+  box-shadow: 0px;
+}
