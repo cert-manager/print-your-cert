@@ -8,7 +8,7 @@ fetchkey=${2:-}
 cardcolor=${3:-"w"}
 
 if [[ -z $certname || -z $fetchkey ]]; then
-	echo "usage: $0 <certname> <fetchkey>"
+    echo "usage: $0 <certname> <fetchkey>"
 fi
 
 echo "Reading PEM from stdin..." >&2
@@ -96,7 +96,7 @@ EOF
 #    -background None -layers Flatten front-$certname.png
 #
 # TODO: update this URL
-url="http://print-your-cert.cert-manager.io/certificate?certName=$certname&fetchKey=$fetchkey"
+url="https://print-your-cert.cert-manager.io/certificate?certName=$certname&fetchKey=$fetchkey"
 # url="http://192.168.1.171:8080/certificate?certName=$certname&fetchKey=$fetchkey"
 
 echo "$url" | qrencode --type PNG --margin 4 -o - | convert -size 696x1109 canvas:white \
