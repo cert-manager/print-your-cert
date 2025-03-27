@@ -3,7 +3,7 @@
 
 set -eu -o pipefail
 
-CM_VERSION=${CM_VERSION:-v1.14.4}
+CM_VERSION=${CM_VERSION:-v1.17.1}
 
 #kind load docker-image --name printyourcert quay.io/jetstack/cert-manager-controller:$CM_VERSION
 #kind load docker-image --name printyourcert quay.io/jetstack/cert-manager-cainjector:$CM_VERSION
