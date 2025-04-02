@@ -74,8 +74,8 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
             out="mocked output for front print"
             brother_rc=0
         else
-            # out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 "front-$certname.png" 2>&1)
-            out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62x100 "front-$certname.png" 2>&1)
+            out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 "front-$certname.png" 2>&1)
+            # out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62x100 "front-$certname.png" 2>&1)
             brother_rc=$?
         fi
 
