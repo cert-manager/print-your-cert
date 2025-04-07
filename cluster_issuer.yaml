@@ -23,7 +23,9 @@ spec:
     organizationalUnits:
     - cert-manager
     countries: # Change for the country you're issuing in!
-    - FR
+    - GB
+    localities: # Change for the city you're issuing in!
+    - London
   duration: 438000h # 50 years.
   issuerRef:
     name: root-print-your-cert-ca-issuer

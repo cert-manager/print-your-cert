@@ -1,5 +1,8 @@
 #! /usr/bin/env bash
 
+# IMPORTANT: pem-to-png is the old version, kept for reference
+# cert-card is the new version
+
 # entr bash -c "./pem-to-png <foo.crt" <<<$'pem-to-png\n'
 
 set -euo pipefail
@@ -64,7 +67,7 @@ line1=$(
     cat <<EOF
 Thank you for visiting the cert-manager
 booth! We hope you are enjoying
-your time in Paris.
+your time in London!
 EOF
 )
 

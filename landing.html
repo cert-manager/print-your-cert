@@ -16,7 +16,8 @@
 
   <body>
     <div class="wrapper">
-      <img src="static/images/logo.svg" alt="Logo" width="220" height="191" />
+      <img src="static/images/logo_grad.svg" alt="Logo" width="325" height="386" style="margin-bottom: 25px;" />
+
       <h1 class="mainTitle">Print Your Certificate</h1>
       <h2>Powered by cert-manager</h2>
 
@@ -43,6 +44,7 @@
             value="{{.Name}}"
             required
             placeholder="Your name"
+            autocomplete="off"
             />
         <div class="inputWrapper">
           <input
@@ -51,6 +53,7 @@
               value="{{.Email}}"
               required
               placeholder="Your email address"
+              autocomplete="off"
               />
           {{if .Error}}
           <div class="error">{{.Error}}</div>
@@ -62,22 +65,60 @@
           </div>
           {{end}}
         </div>
-        <button type="submit">Get your certificate</button>
+        <div class="inputWrapper">
+          <p>Pick your certificate's color:</p>
+          <table>
+            <tr>
+              <td>
+                <label for="P">Pink</label>
+                <input type="radio" name="cardcolor" id="P" value="P" checked />
+              </td>
+
+              <td>
+                <label for="R">Random!</label>
+                <input type="radio" name="cardcolor" id="R" value="R" checked />
+              </td>
+
+              <td>
+                <label for="BLK">Black</label>
+                <input type="radio" name="cardcolor" id="BLK" value="BLK" checked />
+              </td>
+						</tr>
+						<tr>
+
+              <td>
+                <label for="Y">Yellow</label>
+                <input type="radio" name="cardcolor" id="Y" value="Y" />
+              </td>
+
+              <td>
+                <label for="W">White</label>
+                <input type="radio" name="cardcolor" id="W" value="W" />
+              </td>
+
+              <td>
+                <label for="BLU">Blue</label>
+                <input type="radio" name="cardcolor" id="BLU" value="BLU" />
+              </td>
+
+              </tr>
+            </table>
+          </div>
+          <button type="submit">Get your certificate</button>
       </form>
 
       <p
           style="
-                 font-size: 10px;
+                 font-size: 0.8em;
                  color: white;
                  max-width: 500px;
                  margin: 20px auto;
                  "
           >
-          The email will not be displayed on the screen, just your name. The name
-          and email are used to fill in the "Subject" field of the X.509
-          certificate, and won't be used for anything else than printing the
-          certificate. The data submitted stays on the Pi, and will be removed
-          after 10 November 2022 (the printed QR code will still work).
+          Your email will not be displayed on-screen, just your name. These
+          details are used to fill in the "Subject" field of the X.509
+          certificate, and will be removed within six months.<br />
+          We may send a follow-up thank you email using the address provided.
       </p>
 
       <div class="push"></div>
@@ -89,7 +130,7 @@
       </p>
       <p class="small">
       Project proudly supported by
-      <a href="https://venafi.com" target="_blank">Venafi</a>
+      <a href="https://venafi.com" target="_blank">Venafi, a CyberArk Company</a>
       </p>
       <p class="small">
       Design by <a href="https://constantinchirila.com" target="_blank">Constantin Chirila</a>

@@ -61,7 +61,8 @@ const (
 	AnnotationPrint  = "print"
 	ConditionPrinted = "Printed"
 
-	AnnotationFetchKey = "fetch-key"
+	AnnotationFetchKey  = "fetch-key"
+	AnnotationCardColor = "card-color"
 )
 
 // Config attempts to load the in-cluster config and falls back to using
@@ -157,9 +158,14 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 
 		personName := r.URL.Query().Get("name")
 		email := r.URL.Query().Get("email")
+		cardColor := strings.ToUpper(r.URL.Query().Get("cardcolor"))
 
-		// Happily return early if the name or email haven't been
-		// provided yet.
+		if cardColor == "" {
+			// default to pink since that's usually the color we have most of
+			cardColor = "P"
+		}
+
+		// Happily return early if the name or email haven't been provided yet.
 		if personName == "" && email == "" {
 			w.WriteHeader(400)
 			tmpl.ExecuteTemplate(w, "landing.html", landingPageData{Name: personName, Email: email, CountPrinted: printed, CountPending: pending, Message: "Welcome! To get your certificate, fill in your name and email."})
@@ -202,7 +208,8 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 			ObjectMeta: metav1.ObjectMeta{
 				Name: certName,
 				Annotations: map[string]string{
-					AnnotationFetchKey: fetchKey,
+					AnnotationFetchKey:  fetchKey,
+					AnnotationCardColor: cardColor,
 				},
 			},
 			Spec: certmanagerv1.CertificateSpec{
@@ -211,7 +218,11 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 				Subject: &certmanagerv1.X509Subject{
 					// Update this with the country you're issuing in!
 					Countries: []string{
-						"FR",
+						"GB",
+					},
+					// Update this with the city you're issuing in!
+					Localities: []string{
+						"London",
 					},
 				},
 				SecretName: certName,
@@ -1104,7 +1115,7 @@ curl --cert chain.pem --key pkey.pem https://guestbook.print-your-cert.cert-mana
 	-d "message=I'm a star"
 `
 
-const signREADME = `Thanks for downloading your certificate from the cert-manager booth at KubeCon Paris 2024!
+const signREADME = `Thanks for downloading your certificate from the cert-manager booth at KubeCon London 2025!
 
 You can run sign.sh to sign the guestbook - feel free to customise the message!
 

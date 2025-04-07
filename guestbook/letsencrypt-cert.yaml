@@ -1,0 +1,46 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: le-issuer
+spec:
+  acme:
+    email: ashley.davis@venafi.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: le-account-key
+    solvers:
+    - dns01:
+        cloudDNS:
+          project: cert-manager-general
+          serviceAccountSecretRef:
+            name: clouddns-dns01-solver-svc-acct
+            key: key.json
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: guestbook-tls
+  namespace: default
+spec:
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  secretName: guestbook-tls
+  commonName: guestbook.print-your-cert.cert-manager.io
+  subject:
+    organizations:
+    - CNCF
+    organizationalUnits:
+    - cert-manager
+    countries:
+    - GB
+    - US
+    - FR
+    - ES
+    - NL
+  dnsNames:
+  - guestbook.print-your-cert.cert-manager.io
+  - readonly-guestbook.print-your-cert.cert-manager.io
+  issuerRef:
+    name: le-issuer
+    kind: Issuer

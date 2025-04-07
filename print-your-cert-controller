@@ -15,8 +15,11 @@ printf "print-your-cert-controller is now watching certificates.\n"
 
 kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
     certname=$(jq -r '.metadata.name | select(.)' <<<"$cert")
+
     annotation_value_print=$(jq -r '.metadata.annotations."print" | select(.)' <<<"$cert")
     annotation_value_fetchkey=$(jq -r '.metadata.annotations."fetch-key" | select(.)' <<<"$cert")
+    annotation_value_cardcolor=$(jq -r '.metadata.annotations."card-color" // "BLK"' <<<"$cert")
+
     condition_status_ready=$(jq -r '.status.conditions[]? | select(.type == "Ready") | .status' <<<"$cert")
     condition_status_printed=$(jq -r '.status.conditions[]? | select(.type == "Printed") |  .status' <<<"$cert")
 
@@ -59,7 +62,7 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
 
         printf "%s: printing.\n" "$(jq -r .metadata.name <<<"$cert")"
 
-        if ! out=$(cert-card "$certname" "$annotation_value_fetchkey" <<<"$pem" 2>&1); then
+        if ! out=$(cert-card "$certname" "$annotation_value_fetchkey" "$annotation_value_cardcolor" <<<"$pem" 2>&1); then
             printf "%s: failed to generate front-....png and back-....png.\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
             continue
         fi
@@ -72,6 +75,7 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
             brother_rc=0
         else
             out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 "front-$certname.png" 2>&1)
+            # out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62x100 "front-$certname.png" 2>&1)
             brother_rc=$?
         fi
 
@@ -94,29 +98,32 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
         out=
         brother_rc=
 
-        if [[ -n $mock ]]; then
-            out="mocked output for front print"
-            brother_rc=0
-        else
-            out=out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back-$certname.png 2>&1)
-            brother_rc=$?
-        fi
+        # This is commented as in SLC we printed labels on one big sticker rather than two smaller stickers
+        # But we might need to uncomment to return to using smaller stickers
+        #if [[ -n $mock ]]; then
+        #    out="mocked output for back print"
+        #    brother_rc=0
+        #else
+        #    # out=out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back-$certname.png 2>&1)
+        #    out=out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62x100 back-$certname.png 2>&1)
+        #    brother_rc=$?
+        #fi
 
-        if [[ $brother_rc != 0 ]]; then
-            printf "%s: failed to print back-$certname.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
-            if ! out=$(kubectl patch cert "$(jq -r .metadata.name <<<"$cert")" --subresource status --type=json -p '
-            [{
-                "op": "add", "path": "/status/conditions", "value":[{
-                    "type": "Printed",
-                    "status": "False",
-                    "reason": "Error",
-                    "message": "brother_ql: '"$(tail -1 <<<"$out")"'"
-                }]
-            }]' 2>&1); then
-                printf "%s: failed to set the 'Printed' condition to 'False': %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
-            fi
-            continue
-        fi
+        #if [[ $brother_rc != 0 ]]; then
+        #    printf "%s: failed to print back-$certname.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
+        #    if ! out=$(kubectl patch cert "$(jq -r .metadata.name <<<"$cert")" --subresource status --type=json -p '
+        #    [{
+        #        "op": "add", "path": "/status/conditions", "value":[{
+        #            "type": "Printed",
+        #            "status": "False",
+        #            "reason": "Error",
+        #            "message": "brother_ql: '"$(tail -1 <<<"$out")"'"
+        #        }]
+        #    }]' 2>&1); then
+        #        printf "%s: failed to set the 'Printed' condition to 'False': %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
+        #    fi
+        #    continue
+        #fi
 
         # Now that the certificate is printed, we can update the status of
         # the certificate.
