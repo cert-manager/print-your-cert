@@ -9,7 +9,7 @@ jobs:
   build-deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@50fbc622fc4ef5163becd7fab6573eac35f8462e # v1
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
           submodules: true
 
@@ -23,7 +23,7 @@ jobs:
       # trigger a github-pages "build & push to CDN". I had to create a personal
       # access token with the 'repo' scope. Also, it is not possible anymore to
       # call that secret "GITHUB_PAT".
-      - uses: peaceiris/actions-gh-pages@373f7f263a76c20808c831209c920827a82a2847 # v3
+      - uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4
         with:
           personal_token: ${{ secrets.GH_PAT }}
           publish_dir: ./public
