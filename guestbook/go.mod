@@ -2,7 +2,7 @@ module github.com/cert-manager/print-your-cert/guestbook
 
 go 1.24.0
 
-require modernc.org/sqlite v1.40.1
+require modernc.org/sqlite v1.42.2
 
 require golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 
