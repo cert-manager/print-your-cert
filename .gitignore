@@ -11,3 +11,6 @@ guestbook/guestbook.sqlite
 
 *.age
 root-print-your-cert-ca.yaml
+
+/.idea/
+/*.iml
