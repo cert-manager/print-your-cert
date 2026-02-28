@@ -5,7 +5,7 @@ go 1.25.0
 toolchain go1.25.5
 
 // see https://github.com/darccio/mergo/blob/cde9f0ea26cccb1168ee3900cf8ca457bb928c3c/README.md#important-notes
-replace github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
+replace github.com/imdario/mergo => github.com/imdario/mergo v1.0.2
 
 require (
 	github.com/cert-manager/cert-manager v1.19.2
