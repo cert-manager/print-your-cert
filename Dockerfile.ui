@@ -1,4 +1,4 @@
-FROM alpine:edge@sha256:9a341ff2287c54b86425cbee0141114d811ae69d88a36019087be6d896cef241
+FROM alpine:3.23@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
 ARG TARGETARCH
 COPY print-your-cert-ui-$TARGETARCH /usr/local/bin/print-your-cert-ui
 ENTRYPOINT ["print-your-cert-ui"]
