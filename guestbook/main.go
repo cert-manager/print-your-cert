@@ -382,7 +382,7 @@ func createDB(ctx context.Context, path string) error {
 
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
-		return fmt.Errorf("failed to open database at %q: %w", dbPath, err)
+		return fmt.Errorf("failed to open database at %q: %w", *dbPath, err)
 	}
 
 	defer db.Close()
