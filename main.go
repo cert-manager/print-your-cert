@@ -1076,7 +1076,7 @@ func main() {
 	fileserver := http.StripPrefix("/", http.FileServer(http.FS(static)))
 	http.Handle("/static/", cachingHeadersMiddleware(fileserver))
 
-	fmt.Printf("Listening on http://" + *listen + ".\n")
+	fmt.Printf("Listening on http://%s.\n", *listen)
 	if err := http.ListenAndServe(*listen, nil); err != nil {
 		log.Fatal(err)
 	}
