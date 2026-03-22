@@ -27,7 +27,7 @@ import (
 	"net/mail"
 	"net/url"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -753,8 +753,8 @@ func listPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 		}
 
 		// We want the newest certificates first.
-		sort.Slice(certs.Items, func(i, j int) bool {
-			return certs.Items[i].CreationTimestamp.Time.After(certs.Items[j].CreationTimestamp.Time)
+		slices.SortFunc(certs.Items, func(a, b certmanagerv1.Certificate) int {
+			return a.CreationTimestamp.Time.Compare(b.CreationTimestamp.Time)
 		})
 
 		var certsOut []certificateItem
@@ -1089,7 +1089,7 @@ func valid(email string) bool {
 }
 
 // Copied over from smallstep's certinfo package.
-func getPublicKeyAlgorithm(algorithm x509.PublicKeyAlgorithm, key interface{}) string {
+func getPublicKeyAlgorithm(algorithm x509.PublicKeyAlgorithm, key any) string {
 	var params string
 	switch pk := key.(type) {
 	case *ecdsa.PublicKey:
