@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -768,7 +769,7 @@ func listPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) func
 				Name:     personName,
 				Email:    email,
 				State:    stateOfCert(cert),
-				Date:     cert.Status.NotBefore.Time,
+				Date:     ptr.Deref(cert.Status.NotBefore, metav1.Time{}).Time,
 			})
 		}
 
