@@ -218,11 +218,11 @@ func landingPage(kclient kubernetes.Interface, cmclient cmversioned.Interface) f
 				Subject: &certmanagerv1.X509Subject{
 					// Update this with the country you're issuing in!
 					Countries: []string{
-						"GB",
+						"NL",
 					},
 					// Update this with the city you're issuing in!
 					Localities: []string{
-						"London",
+						"Amsterdam",
 					},
 				},
 				SecretName: certName,
@@ -1115,7 +1115,7 @@ curl --cert chain.pem --key pkey.pem https://guestbook.print-your-cert.cert-mana
 	-d "message=I'm a star"
 `
 
-const signREADME = `Thanks for downloading your certificate from the cert-manager booth at KubeCon London 2025!
+const signREADME = `Thanks for downloading your certificate from the cert-manager booth at KubeCon Amsterdam 2026!
 
 You can run sign.sh to sign the guestbook - feel free to customise the message!
 
