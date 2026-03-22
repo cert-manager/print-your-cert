@@ -431,7 +431,7 @@ Finally, install `k3d`, `helm`, and `kubectl`:
 ```bash
 # From the Raspberry Pi:
 curl -Ls https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
-curl -Ls https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+curl -Ls https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 ```
