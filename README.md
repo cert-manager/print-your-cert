@@ -638,7 +638,7 @@ kubectl apply -f root_issuer_prod.yaml
 kubectl apply -f cluster_issuer.yaml
 ```
 
-Then, decrypt the root CA. The passphrase is available in the Venafi 1Password
+Then, decrypt the root CA. The passphrase is available in the Palo Alto Networks 1Password
 in the `cert-manager-team` vault.
 
 ```bash
