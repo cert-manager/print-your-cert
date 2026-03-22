@@ -98,32 +98,29 @@ kubectl get cert -ojson --watch | jq -c --unbuffered | while read -r cert; do
         out=
         brother_rc=
 
-        # This is commented as in SLC we printed labels on one big sticker rather than two smaller stickers
-        # But we might need to uncomment to return to using smaller stickers
-        #if [[ -n $mock ]]; then
-        #    out="mocked output for back print"
-        #    brother_rc=0
-        #else
-        #    # out=out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back-$certname.png 2>&1)
-        #    out=out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62x100 back-$certname.png 2>&1)
-        #    brother_rc=$?
-        #fi
+        if [[ -n $mock ]]; then
+            out="mocked output for back print"
+            brother_rc=0
+        else
+            out=out=$(brother_ql --model QL-820NWB --printer usb://0x04f9:0x209d print --label 62 back-$certname.png 2>&1)
+            brother_rc=$?
+        fi
 
-        #if [[ $brother_rc != 0 ]]; then
-        #    printf "%s: failed to print back-$certname.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
-        #    if ! out=$(kubectl patch cert "$(jq -r .metadata.name <<<"$cert")" --subresource status --type=json -p '
-        #    [{
-        #        "op": "add", "path": "/status/conditions", "value":[{
-        #            "type": "Printed",
-        #            "status": "False",
-        #            "reason": "Error",
-        #            "message": "brother_ql: '"$(tail -1 <<<"$out")"'"
-        #        }]
-        #    }]' 2>&1); then
-        #        printf "%s: failed to set the 'Printed' condition to 'False': %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
-        #    fi
-        #    continue
-        #fi
+        if [[ $brother_rc != 0 ]]; then
+            printf "%s: failed to print back-$certname.png: %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tail -1 <<<"$out")"
+            if ! out=$(kubectl patch cert "$(jq -r .metadata.name <<<"$cert")" --subresource status --type=json -p '
+            [{
+                "op": "add", "path": "/status/conditions", "value":[{
+                    "type": "Printed",
+                    "status": "False",
+                    "reason": "Error",
+                    "message": "brother_ql: '"$(tail -1 <<<"$out")"'"
+                }]
+            }]' 2>&1); then
+                printf "%s: failed to set the 'Printed' condition to 'False': %s\n" "$(jq -r .metadata.name <<<"$cert")" "$(tr $'\n' ' ' <<<"$out")"
+            fi
+            continue
+        fi
 
         # Now that the certificate is printed, we can update the status of
         # the certificate.
