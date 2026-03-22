@@ -70,9 +70,9 @@ cat >/tmp/crt-$certname
 line1=$(
     cat <<EOF
 Thank you for visiting the cert-manager booth
-at KubeCon EU 2025!
+at KubeCon EU 2026!
 
-We hope you\'re enjoying London!
+We hope you\'re enjoying Amsterdam!
 
 EOF
 )
