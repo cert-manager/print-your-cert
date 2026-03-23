@@ -139,6 +139,12 @@ func writePage(db *sql.DB, ntfyTopic *string) http.Handler {
 		}
 
 		email := EmailFromContext(r.Context())
+
+		if len(email) > 50 {
+			http.Error(w, "email too long", http.StatusBadRequest)
+			return
+		}
+
 		userAgent := getUserAgent(r)
 		message := r.Form.Get("message")
 
