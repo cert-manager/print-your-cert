@@ -2,7 +2,7 @@ module github.com/cert-manager/print-your-cert/guestbook
 
 go 1.25.0
 
-require modernc.org/sqlite v1.48.1
+require modernc.org/sqlite v1.48.2
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
